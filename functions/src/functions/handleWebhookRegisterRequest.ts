@@ -10,15 +10,15 @@ export async function handleWebhookRegisterRequest(req: Request): Promise<Respon
   const accessToken = await getAccessToken("webhook-endpoints");
 
   // if webhook already registered on the given baseUrl, remove it
-  const existingWebhook = (await getWebhooks(accessToken)).webhookEndpoints.find((webhook) => webhook.url === baseUrl);
+  const existingWebhook = (await getWebhooks(accessToken)).webhookEndpoints.find((webhook) => webhook.url.startsWith(baseUrl));
   if (existingWebhook) {
     await removeWebhook(existingWebhook.id, accessToken);
-    await firestore().collection("tink-webhooks").doc(existingWebhook.id).delete();
+    await firestore.collection("tink-webhooks").doc(existingWebhook.id).delete();
   }
 
   // register  webhook for the given baseUrl
   const webhook = await registerWebhook(`${baseUrl}${WEBHOOK_PATH}`, accessToken);
-  await firestore().collection("tink-webhooks").doc(webhook.id).set(webhook);
+  await firestore.collection("tink-webhooks").doc(webhook.id).set(webhook);
 
   return new ResponseEntity(200);
 }

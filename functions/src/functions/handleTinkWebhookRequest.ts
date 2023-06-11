@@ -19,7 +19,7 @@ export async function handleTinkWebhookRequest(req: Request): Promise<ResponseEn
   const bypassSignature = getQueryParam(req, "bypassSignature", "true");
 
   // store webhook call for debug purpose
-  await firestore().collection("tink-webhooks").doc(body.webhook.id).collection("calls").add(body.content);
+  await firestore.collection("tink-webhooks").doc(body.webhook.id).collection("calls").add(body.content);
 
   if (bypassSignature !== "true") {
     await checkSignature(req, body.webhook.id);
@@ -52,7 +52,7 @@ async function checkSignature(req: Request, webhookId: string) {
     throw new ResponseError(400, "Bad signature");
   }
 
-  const secret = (await firestore().collection("tink-webhooks").doc(webhookId).get()).data()?.secret;
+  const secret = (await firestore.collection("tink-webhooks").doc(webhookId).get()).data()?.secret;
   if (!secret) {
     throw new ResponseError(400, "The given webhook id does not exist");
   }

@@ -33,7 +33,7 @@ export function getQueryParam(req: FunctionHttpRequest, paramName: string, defau
   const paramValue = req.query[paramName];
   if (!paramValue) {
     if (!defaultValue) {
-      throw new ResponseError(400, `Missing required '${paramValue}' query parameter`);
+      throw new ResponseError(400, `Missing required '${paramName}' query parameter`);
     }
     return defaultValue;
   }

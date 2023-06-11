@@ -1,12 +1,4 @@
-import {Firestore} from "firebase-admin/firestore";
-import {initializeApp as initializeFirebaseApp, apps as firebaseApps, firestore as getFirestore} from "firebase-admin";
+import {initializeFirestore} from "firebase-admin/firestore";
+import {initializeApp} from "firebase-admin/app";
 
-
-export function firestore(): Firestore {
-  // todo: cleaner way to really check if FirebaseApp exists admin.apps.findIndex((app) => app instanceof FirebaseApp)
-
-  if (firebaseApps.length == 0) {
-    initializeFirebaseApp();
-  }
-  return getFirestore();
-}
+export const firestore = initializeFirestore(initializeApp());
