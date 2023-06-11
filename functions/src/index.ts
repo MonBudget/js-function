@@ -4,8 +4,8 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import {ResponseError, ResponseEntity} from "./httpUtils";
-import {WEBHOOK_PATH} from "./functions/handleTinkWebhookRequest";
 
+export const WEBHOOK_PATH = "/tink-update-webhook";
 
 setGlobalOptions({
   region: "europe-west1",

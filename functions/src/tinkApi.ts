@@ -19,8 +19,8 @@ type GetWebhooksResponse = {
     ]
 }
 
-export async function getWebhooks(accessToken: string): Promise<GetWebhooksResponse> {
-  return await fetcheuh("GET", "https://api.tink.com/events/v2/webhook-endpoints", accessToken);
+export function getWebhooks(accessToken: string): Promise<GetWebhooksResponse> {
+  return fetcheuh("GET", "https://api.tink.com/events/v2/webhook-endpoints", accessToken);
 }
 
 type RegisteredWebhook = {
@@ -34,8 +34,8 @@ type RegisteredWebhook = {
     secret: string,
 }
 
-export async function registerWebhook(url: string, accessToken: string): Promise<RegisteredWebhook> {
-  return await fetcheuh("POST", "https://api.tink.com/events/v2/webhook-endpoints", accessToken, {
+export function registerWebhook(url: string, accessToken: string): Promise<RegisteredWebhook> {
+  return fetcheuh("POST", "https://api.tink.com/events/v2/webhook-endpoints", accessToken, {
     url,
     enabledEvents: [
       "refresh:finished",
@@ -44,6 +44,10 @@ export async function registerWebhook(url: string, accessToken: string): Promise
       "account-transactions:modified",
     ],
   });
+}
+
+export function removeWebhook(webhookId: string, accessToken: string): Promise<RegisteredWebhook> {
+  return fetcheuh("DELETE", `https://api.tink.com/events/v2/webhook-endpoints/${webhookId}`, accessToken);
 }
 
 type TinkAccessTokenScope = "webhook-endpoints"

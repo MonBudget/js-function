@@ -29,10 +29,13 @@ export class ResponseEntity<T = any> {
   }
 }
 
-export function getQueryParam(req: FunctionHttpRequest, paramName: string): string {
+export function getQueryParam(req: FunctionHttpRequest, paramName: string, defaultValue: string | undefined = undefined): string {
   const paramValue = req.query[paramName];
   if (!paramValue) {
-    throw new ResponseError(400, `Missing '${paramValue}' parameter`);
+    if (!defaultValue) {
+      throw new ResponseError(400, `Missing required '${paramValue}' query parameter`);
+    }
+    return defaultValue;
   }
   return paramValue as string;
 }
