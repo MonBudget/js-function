@@ -1,6 +1,6 @@
 // import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 // import {DocumentSnapshot} from "firebase-admin/firestore";
-// import * as logger from "firebase-functions/logger";
+import * as logger from "firebase-functions/logger";
 import {onRequest} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import {ResponseError, ResponseEntity} from "./httpUtils";
@@ -18,6 +18,8 @@ setGlobalOptions({
 });
 
 export const tinkWebhook = onRequest({cors: true /* todo: mettre nom de domaine tink*/}, async (req, res) => {
+  logger.info(`Request headers: ${JSON.stringify(req.headers)}`);
+  logger.info(`Request body: ${req.rawBody}`);
   try {
     let responseEntity: ResponseEntity<any>;
     if (req.path === "/tink-update-webhook/register" && req.method === "POST") {
