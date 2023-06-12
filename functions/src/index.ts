@@ -3,7 +3,7 @@
 import * as logger from "firebase-functions/logger";
 import {onRequest} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
-import {ResponseError, ResponseEntity} from "./httpUtils";
+import {ResponseError} from "./httpUtils";
 
 export const WEBHOOK_PATH = "/tink-update-webhook";
 
@@ -21,21 +21,25 @@ export const tinkWebhook = onRequest({cors: true /* todo: mettre nom de domaine 
   logger.info(`Request headers: ${JSON.stringify(req.headers)}`);
   logger.info(`Request body: ${req.rawBody}`);
   try {
-    let responseEntity: ResponseEntity<any>;
+    let body: any | undefined;
     if (req.path === "/tink-update-webhook/register" && req.method === "POST") {
       const {handleWebhookRegisterRequest} = await import("./functions/handleWebhookRegisterRequest");
-      responseEntity = await handleWebhookRegisterRequest(req);
+      body = await handleWebhookRegisterRequest(req);
     } else if (req.path === WEBHOOK_PATH && req.method === "POST") {
-      const {handleTinkWebhookRequest} = await import("./functions/handleTinkWebhookRequest");
-      responseEntity = await handleTinkWebhookRequest(req);
+      const {handleTinkEvent} = await import("./functions/handleTinkEvent");
+      body = await handleTinkEvent(req);
+    } else if (req.path === "/connect-bank-account-link" && req.method === "GET") {
+      const {handleBankConnectionLinkRequest} = await import("./functions/handleBankConnectionLinkRequest");
+      body = await handleBankConnectionLinkRequest(req);
     } else {
       throw new ResponseError(404, "No matching handler for your request");
     }
-    res.status(responseEntity.responseCode).send(responseEntity.body);
+    res.status(200).send(body);
   } catch (error) {
     if (error instanceof ResponseError) {
       res.status(error.responseCode).send({message: error.message});
     } else {
+      logger.error("Internal error", error);
       let reason: string | undefined;
       if (error instanceof Error) {
         reason = error.message;

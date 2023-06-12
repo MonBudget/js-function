@@ -6,7 +6,7 @@ export class ResponseError extends Error {
     return this._responseCode;
   }
 
-  constructor(responseCode: number, message: string) {
+  constructor(responseCode: number, message: string | undefined = undefined) {
     super(message);
     this._responseCode = responseCode;
   }
@@ -42,7 +42,7 @@ export function getQueryParam(req: FunctionHttpRequest, paramName: string, defau
 
 export async function fetcheuh<T = any>(
   method: "POST" | "GET" | "DELETE",
-  url: string,
+  url: string | URL,
   bearerToken: string | undefined = undefined,
   body: URLSearchParams | any | undefined = undefined
 ): Promise<T> {
