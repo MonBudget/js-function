@@ -134,7 +134,7 @@ async function updateAccount(params: {accountId: string, externalUserId: string}
     currencyCode: account.balances?.available?.amount?.currencyCode ?? account.balances?.booked?.amount?.currencyCode,
     currentBalance: amountToNumber(account.balances?.available?.amount),
     bookedBalance: amountToNumber(account.balances?.booked?.amount),
-    lastRefresh: Timestamp.fromMillis(Date.parse(account.dates.lastRefreshed)),
+    lastRefresh: Timestamp.fromDate(account.dates.lastRefreshed),
     fromTink: account,
   }, {mergeFields: [
     "id",

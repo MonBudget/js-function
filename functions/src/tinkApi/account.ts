@@ -23,7 +23,7 @@ const AccountSchema = zod.object({
     available: zod.object({amount: MonetaryAmountSchema}).optional(),
   }).optional(),
   financialInstitutionId: zod.string().optional(),
-  dates: zod.object({lastRefreshed: zod.string().datetime()}),
+  dates: zod.object({lastRefreshed: zod.string().datetime().transform((str) => new Date(str))}),
   identifiers: zod.object({
     iban: zod.object({
       iban: zod.string(),

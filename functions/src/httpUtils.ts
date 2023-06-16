@@ -1,5 +1,5 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
-import {ZodType, ZodError} from "zod";
+import {ZodType, ZodError, ZodTypeDef} from "zod";
 
 export class ResponseError extends Error {
   private _responseCode: number;
@@ -46,13 +46,13 @@ export function getQueryParam(req: FunctionHttpRequest, paramName: string, defau
   return paramValue as string;
 }
 
-export async function fetcheuh<T, B>(
+export async function fetcheuh<TIn, TOut, B>(
   method: "POST" | "GET" | "DELETE",
   url: string | URL,
   bearerToken: string | undefined = undefined,
   body: URLSearchParams | B | undefined = undefined,
-  responseSchema: ZodType<T>,
-): Promise<T> {
+  responseSchema: ZodType<TOut, ZodTypeDef, TIn>,
+): Promise<TOut> {
   let contentType: string;
   let content: string | URLSearchParams;
   if (body instanceof URLSearchParams) {
@@ -78,10 +78,10 @@ export async function fetcheuh<T, B>(
   return handleJsonResponse(response, responseSchema);
 }
 
-async function handleJsonResponse<T>(
+async function handleJsonResponse<TOut, TIn>(
   response: Response,
-  responseSchema: ZodType<T>,
-): Promise<T> {
+  responseSchema: ZodType<TOut, ZodTypeDef, TIn>,
+): Promise<TOut> {
   const json = await response.json();
   if (!response.ok) {
     throw new ResponseError(500, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, json);
