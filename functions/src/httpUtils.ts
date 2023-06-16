@@ -1,18 +1,24 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
+import {ZodType, ZodError} from "zod";
 
 export class ResponseError extends Error {
   private _responseCode: number;
   public get responseCode(): number {
     return this._responseCode;
   }
+  private _details: any;
+  public get details(): any {
+    return this._details;
+  }
 
-  constructor(responseCode: number, message: string | undefined = undefined) {
+  constructor(responseCode: number, message: string | undefined = undefined, details: any = undefined) {
     super(message);
     this._responseCode = responseCode;
+    this._details = details;
   }
 }
 
-export class ResponseEntity<T = any> {
+export class ResponseEntity<T> {
   private _responseCode: number;
   public get responseCode(): number {
     return this._responseCode;
@@ -40,11 +46,12 @@ export function getQueryParam(req: FunctionHttpRequest, paramName: string, defau
   return paramValue as string;
 }
 
-export async function fetcheuh<T = any>(
+export async function fetcheuh<T, B>(
   method: "POST" | "GET" | "DELETE",
   url: string | URL,
   bearerToken: string | undefined = undefined,
-  body: URLSearchParams | any | undefined = undefined
+  body: URLSearchParams | B | undefined = undefined,
+  responseSchema: ZodType<T>,
 ): Promise<T> {
   let contentType: string;
   let content: string | URLSearchParams;
@@ -68,13 +75,23 @@ export async function fetcheuh<T = any>(
     body: content,
     headers,
   });
-  return handleJsonResponse(response);
+  return handleJsonResponse(response, responseSchema);
 }
 
-async function handleJsonResponse<T = any>(response: Response): Promise<T> {
+async function handleJsonResponse<T>(
+  response: Response,
+  responseSchema: ZodType<T>,
+): Promise<T> {
   const json = await response.json();
   if (!response.ok) {
-    throw new ResponseError(500, `Http request error for ${response.url}: ${json.errorMessage}`);
+    throw new ResponseError(500, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, json);
   }
-  return json;
+  try {
+    return responseSchema.parse(json);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new ResponseError(500, `Error during http response parsing for ${response.url}`, {json: json, errors: error.errors});
+    }
+    throw error;
+  }
 }

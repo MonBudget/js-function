@@ -1,47 +1,87 @@
+import * as zod from "zod";
 import {fetcheuh} from "../httpUtils";
-import {MonetaryAmount} from "./shared";
+import {MonetaryAmountSchema, nextPageTokenTransformer} from "./shared";
 
-export async function getTransactions(
+export async function getTransactionsPage(params: {
   accessToken: string,
-  pageSize: number | undefined = undefined,
-  earliestBookedDate: string | undefined = undefined,
-  latestBookedDate: string | undefined = undefined,
-  pageToken: string | undefined = undefined,
-  accountIds: string[] | undefined = undefined,
-  status: TransactionStatus | undefined = undefined,
-): Promise<{
-    transactions: Transaction[]
-    nextPageToken: string | undefined
-  }> {
+  pageSize: number | undefined,
+  earliestBookedDate: string | undefined,
+  latestBookedDate: string | undefined,
+  pageToken: string | undefined,
+  accountIds: string[] | undefined,
+  status: TransactionStatus | TransactionStatus[] | undefined,
+}) {
   const url = new URL("https://api.tink.com/data/v2/transactions");
-  if (pageSize) url.searchParams.append("pageSize", pageSize.toString());
-  if (pageToken) url.searchParams.append("pageToken", pageToken);
-  if (accountIds) url.searchParams.append("accountIdIn", accountIds.join(","));
-  if (earliestBookedDate) url.searchParams.append("bookedDateGte", earliestBookedDate);
-  if (latestBookedDate) url.searchParams.append("bookedDateLte", latestBookedDate);
-  if (status) url.searchParams.append("statusIn", status);
-
-  return await fetcheuh("GET", url, accessToken);
-}
-
-export type Transaction = {
-    id: string,
-    accountId: string,
-    reference: string | undefined,
-    amount: MonetaryAmount,
-    descriptions: {
-      original: string
-      display: string
-    },
-    dates: {
-      booked: string | undefined
-      value: string | undefined
-    } | undefined,
-    identifiers: {providerTransactionId: string},
-    types: {type: TransactionType},
-    status: TransactionStatus,
-    providerMutability: string,
+  if (params.pageSize) url.searchParams.append("pageSize", params.pageSize.toString());
+  if (params.pageToken) url.searchParams.append("pageToken", params.pageToken);
+  if (params.accountIds) url.searchParams.append("accountIdIn", params.accountIds.join(","));
+  if (params.earliestBookedDate) url.searchParams.append("bookedDateGte", params.earliestBookedDate);
+  if (params.latestBookedDate) url.searchParams.append("bookedDateLte", params.latestBookedDate);
+  if (params.status) {
+    if (params.status instanceof Array) {
+      url.searchParams.append("statusIn", params.status.join(","));
+    } else {
+      url.searchParams.append("statusIn", params.status);
+    }
   }
 
-export type TransactionStatus = "UNDEFINED" | "PENDING" | "BOOKED"
-export type TransactionType = "UNDEFINED" | "CREDIT_CARD" | "PAYMENT" | "WITHDRAWAL" | "DEFAULT" | "TRANSFER"
+  return await fetcheuh("GET", url, params.accessToken, undefined, TransactionPageSchema);
+}
+
+export async function* getAllTransactions(params: {
+  accessToken: string,
+  pageSize: number | undefined,
+  earliestBookedDate: string | undefined,
+  latestBookedDate: string | undefined,
+  accountIds: string[] | undefined,
+  status: TransactionStatus | TransactionStatus[] | undefined,
+}) {
+  let nextPageToken: string | undefined = undefined;
+  while (true) {
+    const page = await getTransactionsPage({...params, pageToken: nextPageToken});
+    for (const transaction of page.transactions) {
+      yield transaction;
+    }
+    if (!page.nextPageToken || page.nextPageToken.length == 0) {
+      return;
+    }
+    nextPageToken = page.nextPageToken;
+  }
+}
+
+const TransactionStatusSchema = zod.enum(["UNDEFINED", "PENDING", "BOOKED"]);
+export type TransactionStatus = zod.infer<typeof TransactionStatusSchema>
+const TransactionTypeSchema = zod.enum(["UNDEFINED", "CREDIT_CARD", "PAYMENT", "WITHDRAWAL", "DEFAULT", "TRANSFER"]);
+export type TransactionType = zod.infer<typeof TransactionTypeSchema>
+
+const TransactionSchema = zod.object({
+  id: zod.string(),
+  accountId: zod.string(),
+  reference: zod.string().optional(),
+  amount: MonetaryAmountSchema,
+  descriptions: zod.object({
+    original: zod.string().trim(),
+    display: zod.string(),
+  }).optional(),
+  dates: zod.object({
+    booked: zod.string().regex(/\d{4}-\d{2}-\d{2}/).optional(),
+    value: zod.string().regex(/\d{4}-\d{2}-\d{2}/).optional(),
+  }).optional(),
+  identifiers: zod.object({
+    providerTransactionId: zod.string().optional(),
+  }).optional(),
+  merchantInformation: zod.object({
+    merchantCategoryCode: zod.string().optional(),
+    merchantName: zod.string().optional(),
+  }).optional(),
+  types: zod.object({
+    type: TransactionTypeSchema,
+  }),
+  status: TransactionStatusSchema,
+  providerMutability: zod.enum(["MUTABILITY_UNDEFINED", "MUTABLE", "IMMUTABLE"]),
+});
+export type Transaction = zod.infer<typeof TransactionSchema>
+const TransactionPageSchema = zod.object({
+  transactions: zod.array(TransactionSchema),
+  nextPageToken: zod.string().transform(nextPageTokenTransformer),
+});

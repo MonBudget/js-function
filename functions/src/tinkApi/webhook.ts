@@ -1,20 +1,22 @@
 import {Request} from "firebase-functions/v2/https";
 import {ResponseError, fetcheuh} from "../httpUtils";
+import * as logger from "firebase-functions/logger";
+import * as zod from "zod";
 
 
-export function getWebhooks(accessToken: string): Promise<GetWebhooksResponse> {
-  return fetcheuh("GET", "https://api.tink.com/events/v2/webhook-endpoints", accessToken);
+export function getWebhooks(accessToken: string) {
+  return fetcheuh("GET", "https://api.tink.com/events/v2/webhook-endpoints", accessToken, undefined, GetWebhooksResponseSchema);
 }
 
-export function registerWebhook(url: string, accessToken: string, enabledEvents: WebhookEventType[]): Promise<RegisteredWebhook> {
+export function registerWebhook(url: string, accessToken: string, enabledEvents: WebhookEventType[]) {
   return fetcheuh("POST", "https://api.tink.com/events/v2/webhook-endpoints", accessToken, {
     url,
     enabledEvents,
-  });
+  }, RegisteredWebhookSchema);
 }
 
-export function removeWebhook(webhookId: string, accessToken: string): Promise<RegisteredWebhook> {
-  return fetcheuh("DELETE", `https://api.tink.com/events/v2/webhook-endpoints/${webhookId}`, accessToken);
+export async function removeWebhook(webhookId: string, accessToken: string) {
+  await fetcheuh("DELETE", `https://api.tink.com/events/v2/webhook-endpoints/${webhookId}`, accessToken, undefined, zod.any().optional());
 }
 
 export async function checkTinkEventSignature(req: Request, secret: string) {
@@ -37,6 +39,7 @@ export async function checkTinkEventSignature(req: Request, secret: string) {
   });
 
   if (parsedHeader.timestamp === undefined || parsedHeader.signature === undefined) {
+    logger.error(`Badly formatted signature header. raw: '${tinkSignatureHeader}'. Parsed signature in jsonPayload`, parsedHeader);
     throw new ResponseError(400, "Bad signature");
   }
 
@@ -47,93 +50,107 @@ export async function checkTinkEventSignature(req: Request, secret: string) {
   }
 }
 
-type GetWebhooksResponse = {
-  webhookEndpoints: [
-      {
-          id: string,
-          enabledEvents: [string],
-          disabled: boolean,
-          url: string,
-          createdAt: string,
-          updatedAt: string,
-      }
-  ]
-}
+const WebhookEventTypeSchema = zod.enum(["refresh:finished",
+  "account:updated",
+  "account:created",
+  "account-transactions:modified",
+  "account-booked-transactions:modified"]);
+export type WebhookEventType = zod.infer<typeof WebhookEventTypeSchema>
 
-export type RegisteredWebhook = {
-    id: string,
-    description: string | undefined,
-    enabledEvents: [string],
-    disabled: boolean,
-    url: boolean,
-    createdAt: string,
-    updatedAt: string,
-    secret: string,
-}
+const GetWebhooksResponseSchema = zod.object({
+  webhookEndpoints: zod.array(zod.object({
+    id: zod.string(),
+    description: zod.string().optional(),
+    enabledEvents: zod.array(WebhookEventTypeSchema),
+    disabled: zod.boolean(),
+    url: zod.string().url(),
+    createdAt: zod.string(),
+    updatedAt: zod.string(),
+  })),
+});
 
-export type WebhookEventType = "refresh:finished"
-                             | "account:updated"
-                             | "account:created"
-                             | "account-transactions:modified"
-                             | "account-booked-transactions:modified"
+const RegisteredWebhookSchema = zod.object({
+  id: zod.string(),
+  description: zod.string().optional(),
+  enabledEvents: zod.array(WebhookEventTypeSchema),
+  disabled: zod.boolean(),
+  url: zod.string().url(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  secret: zod.string(),
+});
+export type RegisteredWebhook = zod.infer<typeof RegisteredWebhookSchema>
 
-type BaseTinkEvent = {
-  context: {
-    userId: string,
-    externalUserId: string,
-  },
-}
+const BaseTinkEventSchema = zod.object({
+  context: zod.object({
+    userId: zod.string(),
+    externalUserId: zod.string(), // Normally optional, but we are always givin the firebase uid as the externalUserId
+  }),
+});
 
-type AccountCreatedEvent = BaseTinkEvent & {
-  content: {
-    id: string
-  },
-  event: "account:created"
-}
+const AccountCreatedEventSchema = BaseTinkEventSchema.extend({
+  event: zod.literal("account:created"),
+  content: zod.object({
+    id: zod.string(),
+  }),
+});
+export type AccountCreatedEvent = zod.infer<typeof AccountCreatedEventSchema>
 
-type AccountUpdatedEvent = BaseTinkEvent & {
-  content: {
-    id: string
-  },
-  event: "account:updated"
-}
+const AccountUpdatedEventSchema = BaseTinkEventSchema.extend({
+  event: zod.literal("account:updated"),
+  content: zod.object({
+    id: zod.string(),
+  }),
+});
+export type AccountUpdatedEvent = zod.infer<typeof AccountUpdatedEventSchema>
 
-type AccountTransactionsModifiedEvent = BaseTinkEvent & {
-  content: {
-    account: {
-      id: string
-    }
-  },
-  event: "account-transactions:modified"
-}
+const AccountTransactionsModifiedEventSchema = BaseTinkEventSchema.extend({
+  event: zod.literal("account-transactions:modified"),
+  content: zod.object({
+    account: zod.object({
+      id: zod.string(),
+    }),
+  }),
+});
+export type AccountTransactionsModifiedEvent = zod.infer<typeof AccountTransactionsModifiedEventSchema>
 
-type AccountBookedTransactionsModifiedEvent = BaseTinkEvent & {
-  content: {
-    account: {
-      id: string
-      transactionsModifiedEarliestBookedDate: string
-    }
-  },
-  event: "account-booked-transactions:modified"
-}
+const AccountBookedTransactionsModifiedEventSchema = BaseTinkEventSchema.extend({
+  event: zod.literal("account-booked-transactions:modified"),
+  content: zod.object({
+    account: zod.object({
+      id: zod.string(),
+      transactionsModifiedEarliestBookedDate: zod.string(),
+    }),
+  }),
+});
+export type AccountBookedTransactionsModifiedEvent = zod.infer<typeof AccountBookedTransactionsModifiedEventSchema>
 
-type RefreshFinishedEvent = BaseTinkEvent & {
-  content: {
-    credentialsId: string,
-    credentialsStatus: "UPDATED" | "TEMPORARY_ERROR" | "AUTHENTICATION_ERROR" | "SESSION_EXPIRED",
-    finished: number, // ts in milliseconds
-    source: "OPERATION_SOURCE_API" | "OPERATION_SOURCE_BACKGROUND" | "OPERATION_SOURCE_STREAMING" | undefined,
-    sessionExpiryDate: 0 | number | undefined // ts in milliseconds
-    detailedError: {
-      type: string,
-      displayMessage: string,
-      details: {
-        "reason" : string,
-        "retryable" : boolean
-      }
-    } | undefined
-  },
-  event: "refresh:finished"
-}
+const RefreshFinishedEventSchema = BaseTinkEventSchema.extend({
+  event: zod.literal("refresh:finished"),
+  content: zod.object({
+    credentialsId: zod.string(),
+    credentialsStatus: zod.enum(["UPDATED", "TEMPORARY_ERROR", "AUTHENTICATION_ERROR", "SESSION_EXPIRED"]),
+    finished: zod.number(),
+    source: zod.enum(["OPERATION_SOURCE_API", "OPERATION_SOURCE_BACKGROUND", "OPERATION_SOURCE_STREAMING"]).optional(),
+    sessionExpiryDate: zod.union([zod.literal(0), zod.number()]).optional(),
+    detailedError: zod.object({
+      type: zod.string(),
+      displayMessage: zod.string(),
+      details: zod.object({
+        reason: zod.string(),
+        retryable: zod.boolean(),
+      }),
+    }).optional(),
+  }),
+});
+export type RefreshFinishedEvent = zod.infer<typeof RefreshFinishedEventSchema>
 
-export type TinkEvent = AccountCreatedEvent | AccountUpdatedEvent | AccountTransactionsModifiedEvent | AccountBookedTransactionsModifiedEvent | RefreshFinishedEvent
+const TinkEventSchema = zod.discriminatedUnion("event", [
+  AccountCreatedEventSchema,
+  AccountUpdatedEventSchema,
+  AccountTransactionsModifiedEventSchema,
+  AccountBookedTransactionsModifiedEventSchema,
+  RefreshFinishedEventSchema,
+]);
+
+export type TinkEvent = zod.infer<typeof TinkEventSchema>

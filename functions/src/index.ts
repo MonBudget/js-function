@@ -18,8 +18,6 @@ setGlobalOptions({
 });
 
 export const tinkWebhook = onRequest({cors: true /* todo: mettre nom de domaine tink*/}, async (req, res) => {
-  logger.info(`Request headers: ${JSON.stringify(req.headers)}`);
-  logger.info(`Request body: ${req.rawBody}`);
   try {
     let body: any | undefined;
     if (req.path === "/tink-update-webhook/register" && req.method === "POST") {
@@ -32,12 +30,13 @@ export const tinkWebhook = onRequest({cors: true /* todo: mettre nom de domaine 
       const {handleBankConnectionLinkRequest} = await import("./functions/handleBankConnectionLinkRequest");
       body = await handleBankConnectionLinkRequest(req);
     } else {
+      logger.info("Request body", req.body);
       throw new ResponseError(404, "No matching handler for your request");
     }
     res.status(200).send(body);
   } catch (error) {
     if (error instanceof ResponseError) {
-      res.status(error.responseCode).send({message: error.message});
+      res.status(error.responseCode).send({message: error.message, details: error.details});
     } else {
       logger.error("Internal error", error);
       let reason: string | undefined;
