@@ -22,7 +22,7 @@ const configuredFunctionsV1 = functionsV1.region("europe-west1")
   .runWith({
     minInstances: 0,
     maxInstances: 1,
-    timeoutSeconds: 10,
+    timeoutSeconds: 60,
     memory: "128MB",
   });
 
