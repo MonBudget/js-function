@@ -1,5 +1,5 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
-import {ZodType, ZodError, ZodTypeDef} from "zod";
+import {ZodType, ZodError, ZodTypeDef, any as zodAny} from "zod";
 
 export class ResponseError extends Error {
   private _responseCode: number;
@@ -51,7 +51,7 @@ export async function fetcheuh<TIn, TOut, B>(
   url: string | URL,
   bearerToken: string | undefined = undefined,
   body: URLSearchParams | B | undefined = undefined,
-  responseSchema: ZodType<TOut, ZodTypeDef, TIn>,
+  responseSchema: ZodType<TOut, ZodTypeDef, TIn> | undefined = undefined,
 ): Promise<TOut> {
   let contentType: string;
   let content: string | URLSearchParams;
@@ -75,22 +75,27 @@ export async function fetcheuh<TIn, TOut, B>(
     body: content,
     headers,
   });
-  return handleJsonResponse(response, responseSchema);
+  return handleJsonResponse(response, responseSchema ?? zodAny());
 }
 
 async function handleJsonResponse<TOut, TIn>(
   response: Response,
   responseSchema: ZodType<TOut, ZodTypeDef, TIn>,
 ): Promise<TOut> {
-  const json = await response.json();
+  let jsonPayload: unknown;
+  try {
+    jsonPayload = await response.json();
+  } catch (error) {
+    jsonPayload = undefined;
+  }
   if (!response.ok) {
-    throw new ResponseError(500, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, json);
+    throw new ResponseError(500, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, jsonPayload);
   }
   try {
-    return responseSchema.parse(json);
+    return responseSchema.parse(jsonPayload);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new ResponseError(500, `Error during http response parsing for ${response.url}`, {json: json, errors: error.errors});
+      throw new ResponseError(500, `Error during http response parsing for ${response.url}`, {json: jsonPayload, errors: error.errors});
     }
     throw error;
   }

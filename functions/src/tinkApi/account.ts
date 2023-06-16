@@ -2,16 +2,16 @@ import {fetcheuh} from "../httpUtils";
 import {MonetaryAmountSchema, nextPageTokenTransformer} from "./shared";
 import * as zod from "zod";
 
-export async function getAccounts(
+export async function getAccounts(params:{
   accessToken: string,
-  pageSize: number | undefined = undefined,
-  pageToken: string | undefined = undefined,
-) {
+  readonly pageSize?: number,
+  readonly pageToken?: string,
+}) {
   const url = new URL("https://api.tink.com/data/v2/accounts");
-  if (pageSize) url.searchParams.append("pageSize", pageSize.toString());
-  if (pageToken) url.searchParams.append("pageToken", pageToken);
+  if (params.pageSize) url.searchParams.append("pageSize", params.pageSize.toString());
+  if (params.pageToken) url.searchParams.append("pageToken", params.pageToken);
 
-  return await fetcheuh("GET", url, accessToken, undefined, AccountPageSchema);
+  return await fetcheuh("GET", url, params.accessToken, undefined, AccountPageSchema);
 }
 
 const AccountSchema = zod.object({
@@ -49,9 +49,9 @@ const AccountPageSchema = zod.object({
 });
 export type Account = zod.infer<typeof AccountSchema>
 
-export async function getAccount(
+export async function getAccount(params:{
   accountId: string,
   accessToken: string,
-) {
-  return await fetcheuh("GET", `https://api.tink.com/data/v2/accounts/${accountId}`, accessToken, undefined, AccountSchema);
+}) {
+  return await fetcheuh("GET", `https://api.tink.com/data/v2/accounts/${params.accountId}`, params.accessToken, undefined, AccountSchema);
 }

@@ -3,7 +3,7 @@ import {app} from "./app";
 
 export const firestore = initializeFirestore(app);
 
-export function startsWithFilter(fieldPath: string | FieldPath, value: string) {
+export function startsWith(fieldPath: string | FieldPath, value: string) {
   const strlength = value.length;
   const strFrontCode = value.slice(0, strlength-1);
   const strEndCode = value.slice(strlength-1, value.length);

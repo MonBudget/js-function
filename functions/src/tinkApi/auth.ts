@@ -19,6 +19,8 @@ const TinkAccessTokenScopeSchema = zod.enum(["webhook-endpoints",
   "authorization:read",
   "user:grant",
   "user:read",
+  "user:create",
+  "user:delete",
   "providers:read"]);
 
 type TinkAccessTokenScope = zod.infer<typeof TinkAccessTokenScopeSchema>

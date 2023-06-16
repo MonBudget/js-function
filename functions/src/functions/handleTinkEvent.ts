@@ -1,5 +1,5 @@
 import {Request} from "firebase-functions/v2/https";
-import {firestore, startsWithFilter} from "../firebase/firestore";
+import {firestore, startsWith} from "../firebase/firestore";
 import {ResponseError} from "../httpUtils";
 import * as logger from "firebase-functions/logger";
 import {
@@ -29,7 +29,7 @@ export async function handleTinkEvent(req: Request) {
     }
     const baseUrl = `https://${req.hostname}`;
     const webhook = (await firestore.collection("tink-webhooks")
-      .where(startsWithFilter("url", baseUrl))
+      .where(startsWith("url", baseUrl))
       .where("enabledEvents", "array-contains", event.event)
       .limit(1).get())
       .docs.at(0)?.data() as (RegisteredWebhook | undefined);
@@ -121,7 +121,7 @@ async function handleAccountBookedTransactionsModifiedEvent(event: AccountBooked
 }
 
 async function updateAccount(params: {accountId: string, externalUserId: string}) {
-  const account = await getAccount(params.accountId, await getAccessTokenForUserId(params.externalUserId, "accounts:read"));
+  const account = await getAccount({accountId: params.accountId, accessToken: await getAccessTokenForUserId(params.externalUserId, "accounts:read")});
   const accountDocument = firestore.collection("bankAccounts").doc(account.id);
   await accountDocument.set({
     id: account.id,
