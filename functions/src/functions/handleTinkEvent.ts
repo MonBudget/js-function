@@ -7,6 +7,7 @@ import {
   AccountCreatedEvent,
   AccountTransactionsModifiedEvent,
   AccountUpdatedEvent,
+  RefreshFinishedEvent,
   RegisteredWebhook,
   TinkEvent,
   checkTinkEventSignature} from "../tinkApi/webhook";
@@ -63,7 +64,7 @@ async function processEvent(event: TinkEvent) {
   logger.info(`Processing event ${event.event}`, event);
   switch (event.event) {
   case "refresh:finished":
-    // fetch and store creds, find duplicates to unify connections like backend
+    await handleRefreshFinishedEvent(event);
     break;
   case "account:created":
     await handleAccountCreatedEvent(event);
@@ -81,6 +82,13 @@ async function processEvent(event: TinkEvent) {
     logger.error("Received an unknown tink event", event);
     throw new ResponseError(400, "Unknown event type");
   }
+}
+
+async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
+  // fetch and store creds, find duplicates to unify connections like backend
+  /* await firestore.collection("bankConnections").doc().set({
+
+  });*/
 }
 
 async function handleAccountUpdatedEvent(event: AccountUpdatedEvent) {

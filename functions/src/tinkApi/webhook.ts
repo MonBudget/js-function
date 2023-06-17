@@ -130,9 +130,9 @@ const RefreshFinishedEventSchema = BaseTinkEventSchema.extend({
   content: zod.object({
     credentialsId: zod.string(),
     credentialsStatus: zod.enum(["UPDATED", "TEMPORARY_ERROR", "AUTHENTICATION_ERROR", "SESSION_EXPIRED"]),
-    finished: zod.number(),
+    finished: zod.number().transform((n) => new Date(n)),
     source: zod.enum(["OPERATION_SOURCE_API", "OPERATION_SOURCE_BACKGROUND", "OPERATION_SOURCE_STREAMING"]).optional(),
-    sessionExpiryDate: zod.union([zod.literal(0), zod.number()]).optional(),
+    sessionExpiryDate: zod.number().transform((n) => n !== 0 ? new Date(n) : undefined).optional(),
     detailedError: zod.object({
       type: zod.string(),
       displayMessage: zod.string(),

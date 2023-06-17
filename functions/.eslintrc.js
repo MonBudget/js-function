@@ -31,7 +31,6 @@ module.exports = {
     "indent": ["error", 2],
     "max-len": ["error", 180],
     "require-jsdoc": 0,
-    "@typescript-eslint/no-explicit-any": ["warn"],
     "@typescript-eslint/no-floating-promises": ["error"],
   },
 };

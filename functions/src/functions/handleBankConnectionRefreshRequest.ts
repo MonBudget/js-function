@@ -1,14 +1,16 @@
 import {Request} from "firebase-functions/v2/https";
 import {getIdToken} from "../firebase/auth";
-import {buildTinkLinkForConnectAccounts} from "../tinkApi/tinkLink";
+import {buildTinkLinkForCredentialsRefresh} from "../tinkApi/tinkLink";
+import {getQueryParam} from "../httpUtils";
 
 
-export async function handleBankConnectionLinkRequest(req: Request) {
+export async function handleBankConnectionRefreshRequest(req: Request) {
   const decodedIdToken = await getIdToken(req);
   const userId = decodedIdToken.uid;
 
   return {
-    tinkLink: (await buildTinkLinkForConnectAccounts({
+    tinkLink: (await buildTinkLinkForCredentialsRefresh({
+      credentialsId: getQueryParam(req, "credentialsId"),
       externalUserId: userId,
       redirectUri: "app://budgit.com/connect-account/callback",
     })).toString(),

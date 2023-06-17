@@ -53,9 +53,12 @@ export const handleHttpCall = onRequest({cors: true /* todo: mettre nom de domai
     } else if (req.path === WEBHOOK_PATH && req.method === "POST") {
       const {handleTinkEvent} = await import("./functions/handleTinkEvent");
       body = await handleTinkEvent(req);
-    } else if (req.path === "/connect-bank-account-link" && req.method === "GET") {
+    } else if (req.path === "/bank-account/connect-link" && req.method === "GET") {
       const {handleBankConnectionLinkRequest} = await import("./functions/handleBankConnectionLinkRequest");
       body = await handleBankConnectionLinkRequest(req);
+    } else if (req.path === "/bank-account/refresh-link" && req.method === "GET") {
+      const {handleBankConnectionRefreshRequest} = await import("./functions/handleBankConnectionRefreshRequest");
+      body = await handleBankConnectionRefreshRequest(req);
     } else {
       logger.info("Request body", req.body);
       throw new ResponseError(404, "No matching handler for your request");
