@@ -16,6 +16,7 @@ import {getAccount} from "../tinkApi/account";
 import {getAllTransactions} from "../tinkApi/transaction";
 import {amountToNumber} from "../tinkApi/shared";
 import {Timestamp} from "firebase-admin/firestore";
+import {getProvider, getProviderConsents} from "../tinkApi/credentials";
 
 
 export async function handleTinkEvent(req: Request) {
@@ -57,7 +58,12 @@ export async function handleTinkEvent(req: Request) {
     }
   }
 
-  await processEvent(event);
+  try {
+    await processEvent(event);
+  } catch (error) {
+    logger.error("Error while processing event", error);
+    throw error;
+  }
 }
 
 async function processEvent(event: TinkEvent) {
@@ -79,32 +85,58 @@ async function processEvent(event: TinkEvent) {
     await handleAccountBookedTransactionsModifiedEvent(event);
     break;
   default:
-    logger.error("Received an unknown tink event", event);
     throw new ResponseError(400, "Unknown event type");
   }
 }
 
 async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
-  // fetch and store creds, find duplicates to unify connections like backend
-  /* await firestore.collection("bankConnections").doc().set({
-
-  });*/
+  logger.info(`Refreshing credentials ${event.content.credentialsId}...`);
+  const accessToken = await getAccessTokenForUserId(event.context.externalUserId, ["provider-consents:read", "credentials:read"]);
+  const providerConsent = (await getProviderConsents({
+    accessToken: accessToken,
+    credentialsId: event.content.credentialsId,
+  })).providerConsents.at(0);
+  if (providerConsent) {
+    const provider = await getProvider({accessToken, includeTestProviders: true, name: providerConsent.providerName});
+    if (provider) {
+      await firestore.collection("bankCredentials").doc(event.content.credentialsId).set({
+        credentialsId: event.content.credentialsId,
+        userId: event.context.externalUserId,
+        accountIds: providerConsent.accountIds.map((accountId) => firestore.collection("bankAccounts").doc(accountId)),
+        status: providerConsent.status,
+        lastRefresh: Timestamp.fromDate(providerConsent.statusUpdated),
+        sessionExpiration: providerConsent.sessionExpiryDate ? Timestamp.fromDate(providerConsent.sessionExpiryDate) : null,
+        financialInstitution: {
+          id: provider.financialInstitutionId,
+          name: provider.financialInstitutionName,
+          logo: provider.images.icon,
+        },
+      });
+      logger.info(`Refreshed credentials ${event.content.credentialsId}`);
+    } else {
+      logger.error(`provider not found for name '${providerConsent.providerName}'`);
+    }
+  } else {
+    logger.error(`providerConsent not found for credentialsId '${event.content.credentialsId}'`);
+  }
 }
 
 async function handleAccountUpdatedEvent(event: AccountUpdatedEvent) {
-  logger.info(`Updating account ${event.content.id}`);
+  logger.info(`Updating account ${event.content.id}...`);
   await updateAccount({
     accountId: event.content.id,
     externalUserId: event.context.externalUserId,
   });
+  logger.info(`Updated account ${event.content.id}`);
 }
 
 async function handleAccountCreatedEvent(event: AccountCreatedEvent) {
-  logger.info(`Creating account ${event.content.id}`);
+  logger.info(`Creating account ${event.content.id}...`);
   await updateAccount({
     accountId: event.content.id,
     externalUserId: event.context.externalUserId,
   });
+  logger.info(`Created account ${event.content.id}`);
 }
 
 async function handleAccountTransactionsModifiedEvent(event: AccountTransactionsModifiedEvent) {
@@ -134,16 +166,15 @@ async function updateAccount(params: {accountId: string, externalUserId: string}
   await accountDocument.set({
     id: account.id,
     userId: params.externalUserId,
-    financialInstitutionId: account.financialInstitutionId,
+    financialInstitutionId: account.financialInstitutionId ?? null,
     type: account.type,
     name: {
       original: account.name,
     },
-    currencyCode: account.balances?.available?.amount?.currencyCode ?? account.balances?.booked?.amount?.currencyCode,
-    currentBalance: amountToNumber(account.balances?.available?.amount),
-    bookedBalance: amountToNumber(account.balances?.booked?.amount),
+    currencyCode: account.balances?.available?.amount?.currencyCode ?? account.balances?.booked?.amount?.currencyCode ?? null,
+    currentBalance: amountToNumber(account.balances?.available?.amount) ?? null,
+    bookedBalance: amountToNumber(account.balances?.booked?.amount) ?? null,
     lastRefresh: Timestamp.fromDate(account.dates.lastRefreshed),
-    fromTink: account,
   }, {mergeFields: [
     "id",
     "userId",
@@ -154,7 +185,6 @@ async function updateAccount(params: {accountId: string, externalUserId: string}
     "currentBalance",
     "bookedBalance",
     "lastRefresh",
-    "fromTink",
   ]});
 }
 
@@ -177,16 +207,15 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
     void bulkWriter.set(transactionsCollection.doc(transaction.id), {
       id: transaction.id,
       userId: params.externalUserId,
-      accountId: transaction.accountId,
+      accountId: firestore.collection("bankAccounts").doc(transaction.accountId),
       pending: params.pending,
       amount: amountToNumber(transaction.amount),
       description: {
-        original: transaction.descriptions?.original,
-        cleaned: transaction.descriptions?.display,
+        original: transaction.descriptions?.original ?? null,
+        cleaned: transaction.descriptions?.display ?? null,
       },
       date: rawDate ? Timestamp.fromMillis(Date.parse(rawDate)) : Timestamp.now(),
       type: transaction.types.type,
-      fromTink: transaction,
     }, {mergeFields: [
       "id",
       "userId",
@@ -197,7 +226,6 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
       "description.cleaned",
       "date",
       "type",
-      "fromTink",
     ]});
   }
   await bulkWriter.close();

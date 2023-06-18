@@ -17,5 +17,8 @@ export async function handleUserDelete(event: UserRecord) {
   for (const doc of (await firestore.collection("bankAccounts").where(Filter.where("userId", "==", event.uid)).get()).docs) {
     void bulkWriter.delete(doc.ref);
   }
+  for (const doc of (await firestore.collection("bankCredentials").where(Filter.where("userId", "==", event.uid)).get()).docs) {
+    void bulkWriter.delete(doc.ref);
+  }
   await bulkWriter.close();
 }
