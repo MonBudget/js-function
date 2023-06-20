@@ -1,6 +1,8 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
 import {ZodType, ZodError, ZodTypeDef, any as zodAny} from "zod";
 import {ResponseError} from "./ResponseError";
+import * as logger from "firebase-functions/logger";
+import {Response as FunctionHttpResponse} from "express-serve-static-core";
 
 export function getQueryParam(req: FunctionHttpRequest, paramName: string, defaultValue: string | undefined = undefined): string {
   const paramValue = req.query[paramName];
@@ -66,4 +68,34 @@ async function handleJsonResponse<TOut, TIn>(
     }
     throw error;
   }
+}
+
+export function isRequest(req: FunctionHttpRequest, method: "GET" | "POST" | "DELETE", path: string) {
+  return req.path === path && req.method === method;
+}
+
+export function handleHttpRequest(router: (req: FunctionHttpRequest, res: FunctionHttpResponse, noRouteFound: () => void) => Promise<unknown>):
+  (request: FunctionHttpRequest, response: FunctionHttpResponse) => void | Promise<void> {
+  return async (req, res) => {
+    try {
+      const body = await router(req, res, () => {
+        logger.info("Request body", req.body);
+        throw new ResponseError(404, "No matching handler for your request");
+      });
+      res.status(200).send(body);
+    } catch (error) {
+      if (error instanceof ResponseError) {
+        res.status(error.responseCode).send({message: error.message, details: error.details});
+      } else {
+        logger.error("Internal error", error);
+        let reason: string | undefined;
+        if (error instanceof Error) {
+          reason = error.message;
+        } else {
+          reason = error?.toString();
+        }
+        res.status(500).send({message: "Internal server error", reason});
+      }
+    }
+  };
 }

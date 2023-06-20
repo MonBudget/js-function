@@ -7,10 +7,10 @@ const CreateUserResponseSchema = zod.object({
   external_user_id: zod.string(),
 });
 
-export function createUser(params: {externalUserId: string, market: string, accessToken: string}) {
+export function createUser(params: {externalUserId: string, market: string, locale?: string, accessToken: string}) {
   return fetcheuh("POST", "https://api.tink.com/api/v1/user/create", params.accessToken, {
     market: params.market,
-    // locale: detected from market
+    locale: params.locale, // detected from market if undefined
     external_user_id: params.externalUserId,
   }, CreateUserResponseSchema);
 }
