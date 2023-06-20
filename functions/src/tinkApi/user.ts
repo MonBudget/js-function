@@ -1,4 +1,4 @@
-import {fetcheuh} from "../httpUtils";
+import {fetcheuh} from "../shared/httpUtils";
 import * as zod from "zod";
 
 

@@ -1,7 +1,8 @@
 import {Request} from "firebase-functions/v2/https";
-import {ResponseError, fetcheuh} from "../httpUtils";
+import {fetcheuh} from "../shared/httpUtils";
 import * as logger from "firebase-functions/logger";
 import * as zod from "zod";
+import {ResponseError} from "../shared/ResponseError";
 
 
 export function getWebhooks(accessToken: string) {
@@ -145,7 +146,7 @@ const RefreshFinishedEventSchema = BaseTinkEventSchema.extend({
 });
 export type RefreshFinishedEvent = zod.infer<typeof RefreshFinishedEventSchema>
 
-const TinkEventSchema = zod.discriminatedUnion("event", [
+export const TinkEventSchema = zod.discriminatedUnion("event", [
   AccountCreatedEventSchema,
   AccountUpdatedEventSchema,
   AccountTransactionsModifiedEventSchema,

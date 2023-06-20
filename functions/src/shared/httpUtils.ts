@@ -1,39 +1,6 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
 import {ZodType, ZodError, ZodTypeDef, any as zodAny} from "zod";
-
-export class ResponseError extends Error {
-  private _responseCode: number;
-  public get responseCode(): number {
-    return this._responseCode;
-  }
-  private _details: unknown;
-  public get details(): unknown {
-    return this._details;
-  }
-
-  constructor(responseCode: number, message: string | undefined = undefined, details: unknown = undefined) {
-    super(message);
-    this._responseCode = responseCode;
-    this._details = details;
-  }
-}
-
-export class ResponseEntity<T> {
-  private _responseCode: number;
-  public get responseCode(): number {
-    return this._responseCode;
-  }
-
-  private _body: T | undefined;
-  public get body(): T | undefined {
-    return this._body;
-  }
-
-  constructor(responseCode: number, body: T | undefined = undefined) {
-    this._responseCode = responseCode;
-    this._body = body;
-  }
-}
+import {ResponseError} from "./ResponseError";
 
 export function getQueryParam(req: FunctionHttpRequest, paramName: string, defaultValue: string | undefined = undefined): string {
   const paramValue = req.query[paramName];

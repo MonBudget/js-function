@@ -3,8 +3,8 @@ import * as functionsV1 from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import {onRequest} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
-import {ResponseError} from "./httpUtils";
 import {beforeUserCreated} from "firebase-functions/v2/identity";
+import {ResponseError} from "./shared/ResponseError";
 
 
 export const WEBHOOK_PATH = "/tink-update-webhook";
@@ -18,14 +18,14 @@ setGlobalOptions({
   memory: "128MiB",
   cpu: 0.25,
 });
-const configuredFunctionsV1 = functionsV1.region("europe-west1")
-  .runWith({
-    minInstances: 0,
-    maxInstances: 1,
-    timeoutSeconds: 60,
-    memory: "128MB",
-  });
 
+
+/*
+export const handleUserCreation = configuredFunctionsV1.auth.user().onCreate(async (user) => {
+  const {handleUserCreation} = await import("./functions/handleUserCreation");
+  await handleUserCreation(user);
+});
+*/
 
 // verify here if it's well registered: https://firebase.google.com/docs/auth/extend-with-blocking-functions?gen=2nd#register_a_blocking_function
 export const handleUserCreationBlocking = beforeUserCreated(async (event) => {
@@ -33,15 +33,16 @@ export const handleUserCreationBlocking = beforeUserCreated(async (event) => {
   await handleBlockingUserCreation(event);
 });
 
-export const handleUserCreation = configuredFunctionsV1.auth.user().onCreate(async (user) => {
-  const {handleUserCreation} = await import("./functions/handleUserCreation");
-  await handleUserCreation(user);
-});
-
-export const handleUserDelete = configuredFunctionsV1.auth.user().onDelete(async (user) => {
-  const {handleUserDelete} = await import("./functions/handleUserDelete");
-  await handleUserDelete(user);
-});
+export const handleUserDelete = functionsV1.region("europe-west1")
+  .runWith({
+    minInstances: 0,
+    maxInstances: 2,
+    timeoutSeconds: 120,
+    memory: "128MB",
+  }).auth.user().onDelete(async (user) => {
+    const {handleUserDelete} = await import("./functions/handleUserDelete");
+    await handleUserDelete(user);
+  });
 
 
 export const handleHttpCall = onRequest({cors: true /* todo: mettre nom de domaine tink*/}, async (req, res) => {
@@ -79,35 +80,3 @@ export const handleHttpCall = onRequest({cors: true /* todo: mettre nom de domai
     }
   }
 });
-
-/*
-export const makeuppercase1 = onDocumentCreated("/messages/{documentId}", (event) => {
-  if (event.data) {
-    return uppercase(event.data);
-  }
-  return null;
-});
-export const makeuppercase2 = onDocumentUpdated("/messages/{documentId}", (event) => {
-  if (event.data?.after) {
-    return uppercase(event.data.after);
-  }
-  return null;
-});
-function uppercase(snapshot: DocumentSnapshot) {
-  const data = snapshot.data();
-  if (!data) return;
-  // Grab the current value of what was written to Firestore.
-  const original = data.original;
-
-  // Access the parameter `{documentId}` with `event.params`
-  logger.log("Uppercasing", snapshot.id, original);
-
-  const uppercase = original.toUpperCase();
-
-  if (uppercase !== data.uppercase) {
-    return snapshot.ref.set({uppercase}, {merge: true});
-  }
-  return null;
-}
-*/
-

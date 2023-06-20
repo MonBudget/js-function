@@ -1,7 +1,7 @@
 import {getAuth} from "firebase-admin/auth";
 import {app} from "./app";
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
-import {ResponseError} from "../httpUtils";
+import {ResponseError} from "../shared/ResponseError";
 
 export const auth = getAuth(app);
 

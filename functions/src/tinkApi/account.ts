@@ -1,4 +1,4 @@
-import {fetcheuh} from "../httpUtils";
+import {fetcheuh} from "../shared/httpUtils";
 import {MonetaryAmountSchema, nextPageTokenTransformer} from "./shared";
 import * as zod from "zod";
 

@@ -1,6 +1,5 @@
 import {Request} from "firebase-functions/v2/https";
 import {firestore, startsWith} from "../firebase/firestore";
-import {ResponseError} from "../httpUtils";
 import * as logger from "firebase-functions/logger";
 import {
   AccountBookedTransactionsModifiedEvent,
@@ -10,6 +9,7 @@ import {
   RefreshFinishedEvent,
   RegisteredWebhook,
   TinkEvent,
+  TinkEventSchema,
   checkTinkEventSignature} from "../tinkApi/webhook";
 import {getAccessTokenForUserId} from "../tinkApi/auth";
 import {getAccount} from "../tinkApi/account";
@@ -17,10 +17,11 @@ import {getAllTransactions} from "../tinkApi/transaction";
 import {amountToNumber} from "../tinkApi/shared";
 import {Timestamp} from "firebase-admin/firestore";
 import {getProvider, getProviderConsents} from "../tinkApi/credentials";
+import {ResponseError} from "../shared/ResponseError";
 
 
 export async function handleTinkEvent(req: Request) {
-  const event: TinkEvent = req.body;
+  const event = TinkEventSchema.parse(req.body);
 
   const bypassSignatureError = req.hostname.startsWith("127.0.0.1") || true; // temporary fix, because some events are not valid
 
@@ -203,6 +204,7 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
     pageSize: undefined,
     status: params.pending ? "PENDING" : "BOOKED",
   })) {
+    firestore.bundle();
     const rawDate = transaction.dates?.value ?? transaction.dates?.booked;
     void bulkWriter.set(transactionsCollection.doc(transaction.id), {
       id: transaction.id,

@@ -1,5 +1,5 @@
 import * as zod from "zod";
-import {fetcheuh} from "../httpUtils";
+import {fetcheuh} from "../shared/httpUtils";
 import {MonetaryAmountSchema, nextPageTokenTransformer} from "./shared";
 
 export async function getTransactionsPage(params: {

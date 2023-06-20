@@ -20,7 +20,7 @@ export async function handleBlockingUserCreation(event: AuthBlockingEvent) {
   logger.info(`(blocking) Creating user ${event.data.uid}`, event);
   await createUser({
     externalUserId: event.data.uid,
-    market: event.locale ?? DEFAULT_MARKET,
+    market: event.locale && event.locale !== "und" ? event.locale : DEFAULT_MARKET,
     accessToken: await getAccessTokenFromScopes("user:create"),
   });
 }
