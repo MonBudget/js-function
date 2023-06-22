@@ -18,6 +18,7 @@ import {amountToNumber} from "../tinkApi/shared";
 import {Timestamp} from "firebase-admin/firestore";
 import {getProvider, getProviderConsents} from "../tinkApi/credentials";
 import {ResponseError} from "../shared/ResponseError";
+import {updateBankCredentials} from "../repository/bankCredentials";
 
 
 export async function handleTinkEvent(req: Request) {
@@ -100,13 +101,14 @@ async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
   if (providerConsent) {
     const provider = await getProvider({accessToken, includeTestProviders: true, name: providerConsent.providerName});
     if (provider) {
-      await firestore.collection("bankCredentials").doc(event.content.credentialsId).set({
+      await updateBankCredentials({
         credentialsId: event.content.credentialsId,
         userId: event.context.externalUserId,
-        accountIds: providerConsent.accountIds.map((accountId) => firestore.collection("bankAccounts").doc(accountId)),
+        accountIds: providerConsent.accountIds,
         status: providerConsent.status,
-        lastRefresh: Timestamp.fromDate(providerConsent.statusUpdated),
-        sessionExpiration: providerConsent.sessionExpiryDate ? Timestamp.fromDate(providerConsent.sessionExpiryDate) : null,
+        error: providerConsent.detailedError ?? null,
+        lastRefresh: providerConsent.statusUpdated,
+        sessionExpiration: providerConsent.sessionExpiryDate ?? null,
         financialInstitution: {
           id: provider.financialInstitutionId,
           name: provider.financialInstitutionName,

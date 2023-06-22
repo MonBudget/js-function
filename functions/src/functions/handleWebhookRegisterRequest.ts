@@ -20,7 +20,7 @@ export async function handleWebhookRegisterRequest(req: Request) {
 
   // register  webhook for the given baseUrl
   const webhook = await registerWebhook(
-    `${baseUrl}${WEBHOOK_PATH}`,
+    `${baseUrl}/onTinkEvent${WEBHOOK_PATH}`,
     accessToken,
     [
       "account-transactions:modified",
