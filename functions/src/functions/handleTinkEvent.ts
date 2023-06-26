@@ -214,6 +214,7 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
       accountId: firestore.collection("bankAccounts").doc(transaction.accountId),
       pending: params.pending,
       amount: amountToNumber(transaction.amount),
+      currencyCode: transaction.amount.currencyCode,
       description: {
         original: transaction.descriptions?.original ?? null,
         cleaned: transaction.descriptions?.display ?? null,
@@ -226,6 +227,7 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
       "accountId",
       "pending",
       "amount",
+      "currencyCode",
       "description.original",
       "description.cleaned",
       "date",

@@ -7,12 +7,13 @@ import {getQueryParam} from "../shared/httpUtils";
 export async function handleBankConnectionRefreshRequest(req: Request) {
   const decodedIdToken = await getIdToken(req);
   const userId = decodedIdToken.uid;
+  const redirectUri = getQueryParam(req, "redirectUri");
 
   return {
     tinkLink: (await buildTinkLinkForCredentialsRefresh({
       credentialsId: getQueryParam(req, "credentialsId"),
       externalUserId: userId,
-      redirectUri: "app://budgit.com/connect-account/callback",
+      redirectUri: redirectUri,
     })).toString(),
   };
 }
