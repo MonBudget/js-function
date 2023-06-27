@@ -34,6 +34,7 @@ export const onUserDelete = functionsV1.region(REGION)
     maxInstances: 2, // Only a few amount of user delete expected
     timeoutSeconds: 120, // long timeout for handling the huge amount of documents to delete
     memory: "128MB",
+    failurePolicy: true,
   }).auth.user().onDelete(async (user) => {
     const {handleUserDelete} = await import("./functions/handleUserDelete");
     await handleUserDelete(user);
