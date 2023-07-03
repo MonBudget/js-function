@@ -208,8 +208,9 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
   })) {
     firestore.bundle();
     const rawDate = transaction.dates?.value ?? transaction.dates?.booked;
-    void bulkWriter.set(transactionsCollection.doc(transaction.id), {
+    const data = {
       id: transaction.id,
+      categoryId: null,
       userId: params.externalUserId,
       accountId: firestore.collection("bankAccounts").doc(transaction.accountId),
       pending: params.pending,
@@ -221,18 +222,21 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
       },
       date: rawDate ? Timestamp.fromMillis(Date.parse(rawDate)) : Timestamp.now(),
       type: transaction.types.type,
-    }, {mergeFields: [
-      "id",
-      "userId",
-      "accountId",
-      "pending",
-      "amount",
-      "currencyCode",
-      "description.original",
-      "description.cleaned",
-      "date",
-      "type",
-    ]});
+    };
+    void bulkWriter.create(transactionsCollection.doc(transaction.id), data).catch(() => {
+      return bulkWriter.set(transactionsCollection.doc(transaction.id), data, {mergeFields: [
+        "id",
+        "userId",
+        "accountId",
+        "pending",
+        "amount",
+        "currencyCode",
+        "description.original",
+        "description.cleaned",
+        "date",
+        "type",
+      ]});
+    });
   }
   await bulkWriter.close();
   logger.info(`Written ${totalWrittenTransactions} transactions`);
