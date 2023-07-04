@@ -211,6 +211,7 @@ async function updateTransactions(params: {accountId: string, externalUserId: st
     const data = {
       id: transaction.id,
       categoryId: null,
+      expenseId: null,
       userId: params.externalUserId,
       accountId: firestore.collection("bankAccounts").doc(transaction.accountId),
       pending: params.pending,
