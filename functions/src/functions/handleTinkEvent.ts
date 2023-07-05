@@ -16,9 +16,8 @@ import {getAccount} from "../tinkApi/account";
 import {getAllTransactions} from "../tinkApi/transaction";
 import {amountToNumber} from "../tinkApi/shared";
 import {Timestamp} from "firebase-admin/firestore";
-import {getProvider, getProviderConsents} from "../tinkApi/credentials";
 import {ResponseError} from "../shared/ResponseError";
-import {updateBankCredentials} from "../repository/bankCredentials";
+import {saveCredentials} from "../services/credentialsService";
 
 
 export async function handleTinkEvent(req: Request) {
@@ -92,36 +91,10 @@ async function processEvent(event: TinkEvent) {
 }
 
 async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
-  logger.info(`Refreshing credentials ${event.content.credentialsId}...`);
-  const accessToken = await getAccessTokenForUserId(event.context.externalUserId, ["provider-consents:read", "credentials:read"]);
-  const providerConsent = (await getProviderConsents({
-    accessToken: accessToken,
+  await saveCredentials({
+    userId: event.context.externalUserId,
     credentialsId: event.content.credentialsId,
-  })).providerConsents.at(0);
-  if (providerConsent) {
-    const provider = await getProvider({accessToken, includeTestProviders: true, name: providerConsent.providerName});
-    if (provider) {
-      await updateBankCredentials({
-        credentialsId: event.content.credentialsId,
-        userId: event.context.externalUserId,
-        accountIds: providerConsent.accountIds,
-        status: providerConsent.status,
-        error: providerConsent.detailedError ?? null,
-        lastRefresh: providerConsent.statusUpdated,
-        sessionExpiration: providerConsent.sessionExpiryDate ?? null,
-        financialInstitution: {
-          id: provider.financialInstitutionId,
-          name: provider.financialInstitutionName,
-          logo: provider.images.icon,
-        },
-      });
-      logger.info(`Refreshed credentials ${event.content.credentialsId}`);
-    } else {
-      logger.error(`provider not found for name '${providerConsent.providerName}'`);
-    }
-  } else {
-    logger.error(`providerConsent not found for credentialsId '${event.content.credentialsId}'`);
-  }
+  });
 }
 
 async function handleAccountUpdatedEvent(event: AccountUpdatedEvent) {

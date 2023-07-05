@@ -1,4 +1,3 @@
-// import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as functionsV1 from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
 import {setGlobalOptions} from "firebase-functions/v2/options";
@@ -60,6 +59,9 @@ export const onAppHttpCall = onRequest({cors: true}, handleHttpRequest(async (re
   } else if (isRequest(req, "GET", "/bank-account/refresh-link")) {
     const {handleBankConnectionRefreshRequest} = await import("./functions/handleBankConnectionRefreshRequest");
     return handleBankConnectionRefreshRequest(req);
+  } else if (isRequest(req, "POST", "/bank-account/credentials")) {
+    const {handleAddCredentialsRequest} = await import("./functions/handleAddCredentialsRequest");
+    return handleAddCredentialsRequest(req);
   } else {
     return noRouteFound();
   }

@@ -35,19 +35,19 @@ const BankCredentialsSchema = zod.object({
 export type BankCredentials = zod.infer<typeof BankCredentialsSchema>
 
 export async function updateBankCredentials(credentials: BankCredentials) {
-  await firestore.collection("bankCredentials").doc(credentials.credentialsId).set({
-    credentialsId: credentials.credentialsId,
-    userId: credentials.userId,
-    accountIds: credentials.accountIds.map((accountId) => firestore.collection("bankAccounts").doc(accountId)),
-    status: credentials.status,
-    error: credentials.error,
-    lastRefresh: Timestamp.fromDate(credentials.lastRefresh),
-    sessionExpiration: credentials.sessionExpiration ? Timestamp.fromDate(credentials.sessionExpiration) : null,
+  const validatedCredentials = BankCredentialsSchema.parse(credentials);
+  await firestore.collection("bankCredentials").doc(validatedCredentials.credentialsId).set({
+    credentialsId: validatedCredentials.credentialsId,
+    userId: validatedCredentials.userId,
+    accountIds: validatedCredentials.accountIds.map((accountId) => firestore.collection("bankAccounts").doc(accountId)),
+    status: validatedCredentials.status,
+    error: validatedCredentials.error,
+    lastRefresh: Timestamp.fromDate(validatedCredentials.lastRefresh),
+    sessionExpiration: validatedCredentials.sessionExpiration ? Timestamp.fromDate(validatedCredentials.sessionExpiration) : null,
     financialInstitution: {
-      id: credentials.financialInstitution.id,
-      name: credentials.financialInstitution.name,
-      logo: credentials.financialInstitution.logo,
+      id: validatedCredentials.financialInstitution.id,
+      name: validatedCredentials.financialInstitution.name,
+      logo: validatedCredentials.financialInstitution.logo,
     },
   });
 }
-
