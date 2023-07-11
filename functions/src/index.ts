@@ -1,8 +1,10 @@
 import * as functionsV1 from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import {beforeUserCreated} from "firebase-functions/v2/identity";
 import {handleHttpRequest, isRequest} from "./shared/httpUtils";
+import * as logger from "firebase-functions/logger";
 
 
 const REGION = "europe-west1";
@@ -66,3 +68,12 @@ export const onAppHttpCall = onRequest({cors: true}, handleHttpRequest(async (re
     return noRouteFound();
   }
 }));
+
+export const onTransactionUpdated = onDocumentUpdated("/bankAccounts/{accountId}/bankAccounts-transactions/{transactionId}", async (event) => {
+  if (!event.data) {
+    logger.warn("Received event onTransactionUpdated with undefined event.data");
+    return;
+  }
+  const {onTransactionUpdated} = await import("./functions/onTransactionUpdated");
+  return onTransactionUpdated({accountId: event.params.accountId, transactionId: event.params.transactionId, before: event.data.before, after: event.data.after});
+});
