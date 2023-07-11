@@ -1,13 +1,18 @@
 /* eslint-disable no-invalid-this */
 import * as firebaseTest from "firebase-functions-test";
 const test = firebaseTest({projectId: "monbudget-2f616"});
-import {afterEach} from "mocha";
+import {afterEach, beforeEach} from "mocha";
 import {assert} from "chai";
 import {firestore} from "../src/firebase/firestore";
 
+beforeEach(function() {
+  console.log("Started test");
+});
 afterEach(async function() {
+  console.log("Ended test");
   await test.firestore.clearFirestoreData("monbudget-2f616");
   test.cleanup();
+  await waitFunctionExecution();
   console.log("Cleaned database");
 });
 
@@ -129,6 +134,160 @@ describe("Cloud function: onExpenseRemoved", () => {
   });
 });
 
+describe("Cloud function: onExpenseCreated", () => {
+  // expense created where already exist expense on child categ -> create exp on cat "a" while already existing expense cat "a:b" and transactions on "a" and "a:b" and "a:b:c"
+  // expense created where already exist expense on parent categ -> create exp on cat "a:b" where "a" already exist
+  it("When the expense is created and there is no other expense in the categ path, all the related transactions are set to this expense", async () => {
+    const transaction1 = await createTransaction({
+      categoryId: "a",
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b",
+    });
+    const transaction3 = await createTransaction({
+      categoryId: "a:b",
+    });
+    const transaction4 = await createTransaction({
+      categoryId: "a:b:c",
+    });
+    await createExpense({
+      categoryId: "zz",
+    });
+    const expense = await createExpense({
+      categoryId: "a:b",
+    });
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, null);
+    assert.equal((await transaction2.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction3.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction4.get()).data()?.expenseId, expense.id);
+  });
+
+  it("When the expense is created and there is already an expense on child categ, " +
+  "then set this expense only to the transactions that don't have an expense on a child categ", async () => {
+    const childExpense = await createExpense({
+      categoryId: "a:b:c",
+    });
+    const transaction1 = await createTransaction({
+      categoryId: "a",
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b",
+    });
+    const transaction3 = await createTransaction({
+      categoryId: "a:b",
+    });
+    const transaction4 = await createTransaction({
+      categoryId: "a:b:c",
+      expenseId: childExpense.id,
+    });
+    const transaction5 = await createTransaction({
+      categoryId: "a:b:d",
+    });
+    await createExpense({
+      categoryId: "zz",
+    });
+    const expense = await createExpense({
+      categoryId: "a:b",
+    });
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, null);
+    assert.equal((await transaction2.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction3.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction4.get()).data()?.expenseId, childExpense.id);
+    assert.equal((await transaction5.get()).data()?.expenseId, expense.id);
+  });
+
+  it("When the expense is created and there is already an expense on parent categ, " +
+  "then set this expense only to the transactions with the category prefixed by this expense", async () => {
+    const parentExpense = await createExpense({
+      categoryId: "a",
+    });
+    const transaction1 = await createTransaction({
+      categoryId: "a",
+      expenseId: parentExpense.id,
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: parentExpense.id,
+    });
+    const transaction3 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: parentExpense.id,
+    });
+    const transaction4 = await createTransaction({
+      categoryId: "a:b:c",
+      expenseId: parentExpense.id,
+    });
+    const transaction5 = await createTransaction({
+      categoryId: "a:b:d",
+      expenseId: parentExpense.id,
+    });
+    await createExpense({
+      categoryId: "zz",
+    });
+    const expense = await createExpense({
+      categoryId: "a:b",
+    });
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, parentExpense.id);
+    assert.equal((await transaction2.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction3.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction4.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction5.get()).data()?.expenseId, expense.id);
+  });
+
+  it("When the expense is created and there is already an expense on parent categ AND child categ, " +
+  "then set this expense only to the transactions between the expense category and the nearest child categ expense", async () => {
+    const parentExpense = await createExpense({
+      categoryId: "a",
+    });
+    const childExpense = await createExpense({
+      categoryId: "a:b:c",
+    });
+    const transaction1 = await createTransaction({
+      categoryId: "a",
+      expenseId: parentExpense.id,
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: parentExpense.id,
+    });
+    const transaction3 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: parentExpense.id,
+    });
+    const transaction4 = await createTransaction({
+      categoryId: "a:b:c",
+      expenseId: childExpense.id,
+    });
+    const transaction5 = await createTransaction({
+      categoryId: "a:b:d",
+      expenseId: parentExpense.id,
+    });
+    await createExpense({
+      categoryId: "zz",
+    });
+    const expense = await createExpense({
+      categoryId: "a:b",
+    });
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, parentExpense.id);
+    assert.equal((await transaction2.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction3.get()).data()?.expenseId, expense.id);
+    assert.equal((await transaction4.get()).data()?.expenseId, childExpense.id);
+    assert.equal((await transaction5.get()).data()?.expenseId, expense.id);
+  });
+});
+
 const defaults = {
   userId: "user-a",
   accountId: "a",
@@ -156,6 +315,6 @@ async function createExpense(params: {userId?: string, categoryId: string, expen
 
 function waitFunctionExecution() {
   return new Promise((resolve) => {
-    setTimeout(resolve, 1500);
+    setTimeout(resolve, 1000);
   });
 }
