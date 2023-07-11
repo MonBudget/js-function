@@ -8,8 +8,8 @@
     "shell": "yarn run build && firebase functions:shell",
     "start": "yarn run shell",
     "deploy": "firebase deploy --only functions",
-    "emulator-test": "yarn run build && firebase emulators:exec 'yarn run test --exit'",
-    "test": "mocha --timeout 10000 --reporter spec lib/test/*.js",
+    "test": "yarn run build && firebase emulators:exec 'yarn run test:mocha'",
+    "test:mocha": "mocha --timeout 10000 --reporter spec lib/test/*.js",
     "logs": "firebase functions:log"
   },
   "engines": {

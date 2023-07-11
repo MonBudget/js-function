@@ -6,9 +6,10 @@ import {findAndUpdateTransactionExpenseId} from "./onTransactionUpdated";
 
 export async function onExpenseRemoved(params: {expenseId: string, doc: DocumentSnapshot}) {
   // expense removed, let's try to put related transactions to another expense, or just put them as unexpected
+  const bulkWriter = firestore.bulkWriter();
   await forEachSnapshotAsync(
     firestore.collectionGroup("bankAccounts-transactions").where("expenseId", "==", params.expenseId),
-    async (doc, bulkWriter) => {
+    async (doc) => {
       if (!await findAndUpdateTransactionExpenseId({
         userId: doc.data().userId,
         accountId: doc.data().accountId,
@@ -19,4 +20,5 @@ export async function onExpenseRemoved(params: {expenseId: string, doc: Document
       }
     }
   );
+  await bulkWriter.close();
 }

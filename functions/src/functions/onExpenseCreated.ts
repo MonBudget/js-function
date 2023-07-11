@@ -32,9 +32,10 @@ export async function onExpenseCreated(params: {expenseId: string, doc: Document
     .where("userId", "==", userId)
     .where(startsWith("categoryId", categoryId));
 
+  const bulkWriter = firestore.bulkWriter();
   await forEachSnapshotAsync(
     query,
-    async (transactionDoc, bulkWriter) => {
+    async (transactionDoc) => {
       // if no expenseId, let's go
       // if already linked to a child expense, ignore it
       if (!transactionDoc.data().expenseId || expenseIdsToExclude.findIndex((expId) => expId === transactionDoc.data().expenseId) === -1) {
@@ -43,4 +44,5 @@ export async function onExpenseCreated(params: {expenseId: string, doc: Document
       }
     }
   );
+  await bulkWriter.close();
 }

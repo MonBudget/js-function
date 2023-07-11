@@ -26,14 +26,12 @@ export async function removeDocumentsRecursively(query: Query, bulkWriter: BulkW
   );
 }
 
-export async function forEachSnapshotAsync(query: Query, onEach: (doc: QueryDocumentSnapshot, bulkWriter: BulkWriter) => Promise<void>) {
+export async function forEachSnapshotAsync(query: Query, onEach: (doc: QueryDocumentSnapshot) => Promise<void>) {
   const stream = streamData(query);
-  const bulkWriter = firestore.bulkWriter();
   await lastValueFrom(
-    stream.pipe(concatMap((data) => onEach(data, bulkWriter))),
+    stream.pipe(concatMap(onEach)),
     {defaultValue: ""}
   );
-  await bulkWriter.close();
 }
 
 async function recursiveDelete(snapshot: QueryDocumentSnapshot, bulkWriter: BulkWriter) {
