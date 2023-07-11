@@ -1,6 +1,6 @@
 import * as functionsV1 from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onDocumentDeleted, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import {beforeUserCreated} from "firebase-functions/v2/identity";
 import {handleHttpRequest, isRequest} from "./shared/httpUtils";
@@ -76,4 +76,13 @@ export const onTransactionUpdated = onDocumentUpdated("/bankAccounts/{accountId}
   }
   const {onTransactionUpdated} = await import("./functions/onTransactionUpdated");
   return onTransactionUpdated({accountId: event.params.accountId, transactionId: event.params.transactionId, before: event.data.before, after: event.data.after});
+});
+
+export const onExpenseRemoved = onDocumentDeleted("/expenses/{expenseId}", async (event) => {
+  if (!event.data) {
+    logger.warn("Received event onExpenseRemoved with undefined event.data");
+    return;
+  }
+  const {onExpenseRemoved} = await import("./functions/onExpenseRemoved");
+  return onExpenseRemoved({expenseId: event.params.expenseId, doc: event.data});
 });

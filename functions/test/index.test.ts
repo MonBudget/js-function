@@ -69,17 +69,77 @@ describe("Cloud function: onTransactionUpdated", () => {
   });
 });
 
+describe("Cloud function: onExpenseRemoved", () => {
+  it("When the expense is removed and there is no other corresponding expense, all the related transactions' expenseId are set to null", async () => {
+    const expense = await createExpense({
+      categoryId: "a:b",
+    });
+    await createExpense({
+      categoryId: "zz",
+    });
+    await createExpense({
+      categoryId: "a:b:c",
+    });
+    const transaction1 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: expense.id,
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b",
+      expenseId: expense.id,
+    });
+    await expense.delete();
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, null);
+    assert.equal((await transaction2.get()).data()?.expenseId, null);
+  });
+
+  it("When the expense is removed and there is another parent expense, all the related transactions are updated with the corresponding expenseId", async () => {
+    await createExpense({
+      categoryId: "z",
+    });
+    await createExpense({
+      categoryId: "a",
+    });
+    await createExpense({
+      categoryId: "a:b:c:d:e",
+    });
+    const parentExpense = await createExpense({
+      categoryId: "a:b",
+    });
+    const expense = await createExpense({
+      categoryId: "a:b:c",
+    });
+    const transaction1 = await createTransaction({
+      categoryId: "a:b:c:d",
+      expenseId: expense.id,
+    });
+    const transaction2 = await createTransaction({
+      categoryId: "a:b:c:d",
+      expenseId: expense.id,
+    });
+    await expense.delete();
+
+    await waitFunctionExecution();
+
+    assert.equal((await transaction1.get()).data()?.expenseId, parentExpense.id);
+    assert.equal((await transaction2.get()).data()?.expenseId, parentExpense.id);
+  });
+});
+
 const defaults = {
   userId: "user-a",
   accountId: "a",
 };
 
-async function createTransaction(params: {accountId?: string, userId?: string, categoryId?: string}) {
+async function createTransaction(params: {accountId?: string, userId?: string, categoryId?: string, expenseId?: string}) {
   const doc = firestore.collection("bankAccounts").doc(params.accountId ?? defaults.accountId).collection("bankAccounts-transactions").doc();
   await doc.create({
     userId: params.userId ?? defaults.userId,
     accountId: params.accountId ?? defaults.accountId,
-    expenseId: null,
+    expenseId: params.expenseId ?? null,
     categoryId: params.categoryId ?? null,
   });
   return doc;
