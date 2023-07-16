@@ -1,6 +1,6 @@
 
 import {firestore, forEachSnapshotAsync} from "../firebase/firestore";
-import {DocumentSnapshot} from "firebase-admin/firestore";
+import {DocumentReference, DocumentSnapshot} from "firebase-admin/firestore";
 import {findAndUpdateTransactionExpenseId} from "./onTransactionUpdated";
 
 
@@ -12,7 +12,7 @@ export async function onExpenseRemoved(params: {expenseId: string, doc: Document
     async (doc) => {
       if (!await findAndUpdateTransactionExpenseId({
         userId: doc.data().userId,
-        accountId: doc.data().accountId,
+        accountId: (doc.data().accountId as DocumentReference).id,
         categoryId: doc.data().categoryId,
         transactionId: doc.id,
       })) { // no expense found, let's put null

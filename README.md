@@ -7,7 +7,7 @@ created from:
 - firebase init functions
 
 dev mode, run in separated consoles:
-- npm run build:watch
+- yarn run build:watch
 - firebase emulators:start
 
 to deploy:
