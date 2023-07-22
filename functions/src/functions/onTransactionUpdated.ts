@@ -7,7 +7,9 @@ export async function onTransactionUpdated(params: {accountId: string, transacti
   const newCategoryId = params.after.data().categoryId;
   const userId = params.after.data().userId;
   if (params.before.data().categoryId !== newCategoryId) {
-    await findAndUpdateTransactionExpenseId({userId: userId, accountId: params.accountId, categoryId: newCategoryId, transactionId: params.transactionId});
+    if (!await findAndUpdateTransactionExpenseId({userId: userId, accountId: params.accountId, categoryId: newCategoryId, transactionId: params.transactionId})) {
+      await setTransactionExpenseId({accountId: params.accountId, transactionId: params.transactionId, expenseId: null});
+    }
   }
 }
 
@@ -26,7 +28,7 @@ export async function findAndUpdateTransactionExpenseId(params: { userId: string
   }
 }
 
-export async function setTransactionExpenseId(params: { accountId: string, transactionId: string, expenseId: string }) {
+export async function setTransactionExpenseId(params: { accountId: string, transactionId: string, expenseId: string|null }) {
   await firestore.collection("bankAccounts")
     .doc(params.accountId)
     .collection("bankAccounts-transactions")
