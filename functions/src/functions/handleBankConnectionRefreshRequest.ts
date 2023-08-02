@@ -1,19 +1,24 @@
 import {Request} from "firebase-functions/v2/https";
-import {getIdToken} from "../firebase/auth";
+import {checkIdToken} from "../firebase/auth";
 import {buildTinkLinkForCredentialsRefresh} from "../tinkApi/tinkLink";
 import {getQueryParam} from "../shared/httpUtils";
 
 
 export async function handleBankConnectionRefreshRequest(req: Request) {
-  const decodedIdToken = await getIdToken(req);
+  const decodedIdToken = await checkIdToken(req);
   const userId = decodedIdToken.uid;
   const redirectUri = getQueryParam(req, "redirectUri");
+  const market = getQueryParam(req, "country");
+  const locale = getQueryParam(req, "locale");
+  const credentialsId = getQueryParam(req, "credentialsId");
 
   return {
     tinkLink: (await buildTinkLinkForCredentialsRefresh({
-      credentialsId: getQueryParam(req, "credentialsId"),
+      credentialsId,
+      market,
+      locale,
       externalUserId: userId,
-      redirectUri: redirectUri,
+      redirectUri,
     })).toString(),
   };
 }

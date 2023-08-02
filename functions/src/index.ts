@@ -5,6 +5,7 @@ import {setGlobalOptions} from "firebase-functions/v2/options";
 import {beforeUserCreated} from "firebase-functions/v2/identity";
 import {handleHttpRequest, isRequest} from "./shared/httpUtils";
 import * as logger from "firebase-functions/logger";
+import * as _allVars from "./vars";
 
 
 const REGION = "europe-west1";
@@ -19,11 +20,13 @@ setGlobalOptions({
   cpu: 0.25,
 });
 
+export const allVariables = _allVars;
 
 // verify here if it's well registered: https://firebase.google.com/docs/auth/extend-with-blocking-functions?gen=2nd#register_a_blocking_function
 export const onUserCreation = beforeUserCreated({
   maxInstances: 10,
   timeoutSeconds: 10,
+  secrets: [_allVars.TINK_KEYS],
 }, async (event) => {
   const {handleUserCreation} = await import("./functions/handleUserCreation");
   await handleUserCreation(event);
@@ -32,17 +35,21 @@ export const onUserCreation = beforeUserCreated({
 export const onUserDelete = functionsV1.region(REGION)
   .runWith({
     minInstances: 0,
-    maxInstances: 2, // Only a few amount of user delete expected
-    timeoutSeconds: 120, // long timeout for handling the huge amount of documents to delete
+    maxInstances: 10, // Only a few amount of user delete expected
+    timeoutSeconds: 240, // long timeout for handling the huge amount of documents to delete
     memory: "128MB",
     failurePolicy: true,
+    secrets: [_allVars.TINK_KEYS],
   }).auth.user().onDelete(async (user) => {
     const {handleUserDelete} = await import("./functions/handleUserDelete");
     await handleUserDelete(user);
   });
 
 export const WEBHOOK_PATH = "/tink-update-webhook";
-export const onTinkEvent = onRequest({cors: true /* todo: mettre nom de domaine tink*/}, handleHttpRequest(async (req, res, noRouteFound) => {
+export const onTinkEvent = onRequest({
+  cors: true /* todo: mettre nom de domaine tink*/,
+  secrets: [_allVars.TINK_KEYS],
+}, handleHttpRequest(async (req, res, noRouteFound) => {
   if (isRequest(req, "POST", "/tink-update-webhook/register")) {
     const {handleWebhookRegisterRequest} = await import("./functions/handleWebhookRegisterRequest");
     return handleWebhookRegisterRequest(req);
@@ -54,16 +61,16 @@ export const onTinkEvent = onRequest({cors: true /* todo: mettre nom de domaine 
   }
 }));
 
-export const onAppHttpCall = onRequest({cors: true}, handleHttpRequest(async (req, res, noRouteFound) => {
+export const onAppHttpCall = onRequest({
+  cors: true,
+  secrets: [_allVars.TINK_KEYS],
+}, handleHttpRequest(async (req, res, noRouteFound) => {
   if (isRequest(req, "GET", "/bank-account/connect-link")) {
     const {handleBankConnectionLinkRequest} = await import("./functions/handleBankConnectionLinkRequest");
     return handleBankConnectionLinkRequest(req);
   } else if (isRequest(req, "GET", "/bank-account/refresh-link")) {
     const {handleBankConnectionRefreshRequest} = await import("./functions/handleBankConnectionRefreshRequest");
     return handleBankConnectionRefreshRequest(req);
-  } else if (isRequest(req, "POST", "/bank-account/credentials")) {
-    const {handleAddCredentialsRequest} = await import("./functions/handleAddCredentialsRequest");
-    return handleAddCredentialsRequest(req);
   } else {
     return noRouteFound();
   }

@@ -5,7 +5,7 @@ import {ResponseError} from "../shared/ResponseError";
 
 export const auth = getAuth(app);
 
-export async function getIdToken(req: FunctionHttpRequest) {
+export async function checkIdToken(req: FunctionHttpRequest) {
   const authorization = req.headers.authorization;
   if (authorization && authorization.startsWith("Bearer ")) {
     const idToken = authorization.substring(7);

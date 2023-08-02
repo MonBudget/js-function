@@ -18,3 +18,7 @@ export function nextPageTokenTransformer(str: string) {
   if (str.length == 0) return undefined;
   return str;
 }
+
+export function isAnonymousExternalUserId(externalUserId: string) {
+  return externalUserId.includes("-");
+}

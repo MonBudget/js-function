@@ -1,10 +1,6 @@
 import {fetcheuh} from "../shared/httpUtils";
 import * as zod from "zod";
-// import { defineSecret } from "firebase-functions/params";
-// const discordApiKey = defineSecret('DISCORD_API_KEY');
-
-export const TINK_CLIENT_ID = "dcaf323e1ac841da84760a80cd64ad19"; // process.env.REACT_APP_CLIENT_ID;
-const TINK_CLIENT_SECRET = "915757c3beb64024849231a559546d2c"; // process.env.TINK_CLIENT_SECRET;
+import {getTinkClientId, getTinkClientSecret} from "../vars";
 
 
 const TinkAccessTokenScopeSchema = zod.enum(["webhook-endpoints",
@@ -36,8 +32,8 @@ const AuthGrantResponseSchema = zod.object({
 
 export async function getAccessTokenFromScopes(scopes: TinkAccessTokenScope | TinkAccessTokenScope[]): Promise<string> {
   const body = new URLSearchParams();
-  body.append("client_id", TINK_CLIENT_ID);
-  body.append("client_secret", TINK_CLIENT_SECRET);
+  body.append("client_id", getTinkClientId());
+  body.append("client_secret", getTinkClientSecret());
   body.append("grant_type", "client_credentials");
   if (scopes instanceof Array) {
     body.append("scope", scopes.join(","));
@@ -50,15 +46,19 @@ export async function getAccessTokenFromScopes(scopes: TinkAccessTokenScope | Ti
 
 export async function getAccessTokenFromCode(code: string): Promise<string> {
   const body = new URLSearchParams();
-  body.append("client_id", TINK_CLIENT_ID);
-  body.append("client_secret", TINK_CLIENT_SECRET);
+  body.append("client_id", getTinkClientId());
+  body.append("client_secret", getTinkClientSecret());
   body.append("grant_type", "authorization_code");
   body.append("code", code);
 
   return (await fetcheuh("POST", "https://api.tink.com/api/v1/oauth/token", undefined, body, AuthResponseSchema)).access_token;
 }
 
-export async function getAuthorizationGrantCode(externalUserId: string, scopes: TinkAccessTokenScope | TinkAccessTokenScope[], accessToken: string): Promise<string> {
+export async function getAuthorizationGrantCodeForExternalUserId(
+  externalUserId: string,
+  scopes: TinkAccessTokenScope | TinkAccessTokenScope[],
+  accessToken: string
+): Promise<string> {
   const body = new URLSearchParams();
   body.append("external_user_id", externalUserId);
   if (scopes instanceof Array) {
@@ -70,7 +70,27 @@ export async function getAuthorizationGrantCode(externalUserId: string, scopes: 
   return (await fetcheuh("POST", "https://api.tink.com/api/v1/oauth/authorization-grant", accessToken, body, AuthGrantResponseSchema)).code;
 }
 
-export async function getAuthorizationGrantDelegateCode(externalUserId: string, scopes: TinkAccessTokenScope | TinkAccessTokenScope[], accessToken: string): Promise<string> {
+export async function getAuthorizationGrantCodeForTinkUserId(
+  userId: string,
+  scopes: TinkAccessTokenScope | TinkAccessTokenScope[],
+  accessToken: string
+): Promise<string> {
+  const body = new URLSearchParams();
+  body.append("user_id", userId);
+  if (scopes instanceof Array) {
+    body.append("scope", scopes.join(","));
+  } else {
+    body.append("scope", scopes);
+  }
+
+  return (await fetcheuh("POST", "https://api.tink.com/api/v1/oauth/authorization-grant", accessToken, body, AuthGrantResponseSchema)).code;
+}
+
+export async function getAuthorizationGrantDelegateCodeForExternalUserId(
+  externalUserId: string,
+  scopes: TinkAccessTokenScope | TinkAccessTokenScope[],
+  accessToken: string
+): Promise<string> {
   const body = new URLSearchParams();
   body.append("external_user_id", externalUserId);
   body.append("id_hint", "Budg'it");
@@ -84,9 +104,15 @@ export async function getAuthorizationGrantDelegateCode(externalUserId: string, 
   return (await fetcheuh("POST", "https://api.tink.com/api/v1/oauth/authorization-grant/delegate", accessToken, body, AuthGrantResponseSchema)).code;
 }
 
-export async function getAccessTokenForUserId(externalUserId: string, scopes: TinkAccessTokenScope | TinkAccessTokenScope[]): Promise<string> {
+export async function getAccessTokenForExternalUserId(externalUserId: string, scopes: TinkAccessTokenScope | TinkAccessTokenScope[]): Promise<string> {
   const authGrantToken = await getAccessTokenFromScopes("authorization:grant");
-  const code = await getAuthorizationGrantCode(externalUserId, scopes, authGrantToken);
+  const code = await getAuthorizationGrantCodeForExternalUserId(externalUserId, scopes, authGrantToken);
+  return getAccessTokenFromCode(code);
+}
+
+export async function getAccessTokenForTinkUserId(tinkUserId: string, scopes: TinkAccessTokenScope | TinkAccessTokenScope[]): Promise<string> {
+  const authGrantToken = await getAccessTokenFromScopes("authorization:grant");
+  const code = await getAuthorizationGrantCodeForTinkUserId(tinkUserId, scopes, authGrantToken);
   return getAccessTokenFromCode(code);
 }
 
@@ -100,6 +126,6 @@ export async function getCodeForTinkLink(externalUserId: string): Promise<string
     "providers:read",
     "user:read",
   ];
-  const code = await getAuthorizationGrantDelegateCode(externalUserId, scopes, authGrantToken);
+  const code = await getAuthorizationGrantDelegateCodeForExternalUserId(externalUserId, scopes, authGrantToken);
   return code;
 }

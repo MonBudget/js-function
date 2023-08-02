@@ -3,7 +3,6 @@ import {firestore, startsWith} from "../firebase/firestore";
 import * as logger from "firebase-functions/logger";
 import {
   AccountBookedTransactionsModifiedEvent,
-  AccountCreatedEvent,
   AccountTransactionsModifiedEvent,
   AccountUpdatedEvent,
   RefreshFinishedEvent,
@@ -11,19 +10,23 @@ import {
   TinkEvent,
   TinkEventSchema,
   checkTinkEventSignature} from "../tinkApi/webhook";
-import {getAccessTokenForUserId} from "../tinkApi/auth";
+import {getAccessTokenForTinkUserId} from "../tinkApi/auth";
 import {getAccount} from "../tinkApi/account";
 import {getAllTransactions} from "../tinkApi/transaction";
-import {amountToNumber} from "../tinkApi/shared";
-import {Timestamp} from "firebase-admin/firestore";
 import {ResponseError} from "../shared/ResponseError";
 import {saveCredentials} from "../services/credentialsService";
+import {saveAccount} from "../services/accountService";
+import {createTransaction, updateTransaction} from "../services/transactionService";
+import {getPastDate, max} from "../shared/utils";
+import {BYPASS_TINK_EVENT_SIGNATURE, BYPASS_TINK_EVENT_SIGNATURE_LOCAL_ONLY, MAX_PAST_DAYS_TO_FETCH} from "../vars";
+import {isAnonymousExternalUserId} from "../tinkApi/shared";
+import {getStableAccountId, setStableTransactionId} from "../services/anonymousStuff";
 
 
 export async function handleTinkEvent(req: Request) {
   const event = TinkEventSchema.parse(req.body);
 
-  const bypassSignatureError = req.hostname.startsWith("127.0.0.1") || true; // temporary fix, because some events are not valid
+  const bypassSignatureError = BYPASS_TINK_EVENT_SIGNATURE_LOCAL_ONLY.value() && req.hostname.startsWith("127.0.0.1") || BYPASS_TINK_EVENT_SIGNATURE.value();
 
   try {
     if (!event.event) {
@@ -60,6 +63,15 @@ export async function handleTinkEvent(req: Request) {
   }
 
   try {
+    if (isAnonymousExternalUserId(event.context.externalUserId)) {
+      const firebaseUserIdDoc = (await firestore.collection("anonymousTinkUsers").doc(event.context.userId).get()).data();
+      if (!firebaseUserIdDoc) {
+        throw new ResponseError(400, "Received event for anonymous user, but unable to resolve real firebase userId");
+      }
+      event.context.externalUserId = firebaseUserIdDoc.firebaseUserId;
+      event.context.anonymous = true;
+    }
+
     await processEvent(event);
   } catch (error) {
     logger.error("Error while processing event", error);
@@ -74,7 +86,7 @@ async function processEvent(event: TinkEvent) {
     await handleRefreshFinishedEvent(event);
     break;
   case "account:created":
-    await handleAccountCreatedEvent(event);
+    // ignored
     break;
   case "account:updated":
     await handleAccountUpdatedEvent(event);
@@ -92,34 +104,33 @@ async function processEvent(event: TinkEvent) {
 
 async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
   await saveCredentials({
-    userId: event.context.externalUserId,
+    tinkUserId: event.context.userId,
+    firebaseUserId: event.context.externalUserId,
     credentialsId: event.content.credentialsId,
+    anonymous: event.context.anonymous,
   });
 }
 
 async function handleAccountUpdatedEvent(event: AccountUpdatedEvent) {
   logger.info(`Updating account ${event.content.id}...`);
-  await updateAccount({
-    accountId: event.content.id,
-    externalUserId: event.context.externalUserId,
-  });
+  const accessToken = await getAccessTokenForTinkUserId(event.context.userId, ["accounts:read"]);
+  const account = await getAccount({accountId: event.content.id, accessToken});
+  let originalAccountId: string|undefined;
+  if (event.context.anonymous) {
+    account.id = getStableAccountId({account, firebaseUserId: event.context.externalUserId});
+    originalAccountId = event.content.id;
+  }
+  await saveAccount({account, firebaseUserId: event.context.externalUserId, originalAccountId});
   logger.info(`Updated account ${event.content.id}`);
-}
-
-async function handleAccountCreatedEvent(event: AccountCreatedEvent) {
-  logger.info(`Creating account ${event.content.id}...`);
-  await updateAccount({
-    accountId: event.content.id,
-    externalUserId: event.context.externalUserId,
-  });
-  logger.info(`Created account ${event.content.id}`);
 }
 
 async function handleAccountTransactionsModifiedEvent(event: AccountTransactionsModifiedEvent) {
   await updateTransactions({
     accountId: event.content.account.id,
-    externalUserId: event.context.externalUserId,
+    firebaseUserId: event.context.externalUserId,
+    tinkUserId: event.context.userId,
     pending: true,
+    anonymous: event.context.anonymous,
     earliestBookedDate: undefined,
   });
 }
@@ -130,88 +141,55 @@ async function handleAccountBookedTransactionsModifiedEvent(event: AccountBooked
   }
   await updateTransactions({
     accountId: event.content.account.id,
-    externalUserId: event.context.externalUserId,
+    firebaseUserId: event.context.externalUserId,
+    tinkUserId: event.context.userId,
     pending: false,
-    earliestBookedDate: event.content.account.transactionsModifiedEarliestBookedDate,
+    anonymous: event.context.anonymous,
+    earliestBookedDate: max(event.content.account.transactionsModifiedEarliestBookedDate, getPastDate(MAX_PAST_DAYS_TO_FETCH.value())),
   });
 }
 
-async function updateAccount(params: {accountId: string, externalUserId: string}) {
-  const account = await getAccount({accountId: params.accountId, accessToken: await getAccessTokenForUserId(params.externalUserId, "accounts:read")});
-  const accountDocument = firestore.collection("bankAccounts").doc(account.id);
-  await accountDocument.set({
-    id: account.id,
-    userId: params.externalUserId,
-    financialInstitutionId: account.financialInstitutionId ?? null,
-    type: account.type,
-    name: {
-      original: account.name,
-    },
-    currencyCode: account.balances?.available?.amount?.currencyCode ?? account.balances?.booked?.amount?.currencyCode ?? null,
-    currentBalance: amountToNumber(account.balances?.available?.amount) ?? null,
-    bookedBalance: amountToNumber(account.balances?.booked?.amount) ?? null,
-    lastRefresh: Timestamp.fromDate(account.dates.lastRefreshed),
-  }, {mergeFields: [
-    "id",
-    "userId",
-    "financialInstitutionId",
-    "type",
-    "name.original",
-    "currencyCode",
-    "currentBalance",
-    "bookedBalance",
-    "lastRefresh",
-  ]});
-}
-
-async function updateTransactions(params: {accountId: string, externalUserId: string, pending: boolean, earliestBookedDate: string|undefined}) {
+async function updateTransactions(params: {
+  anonymous: boolean,
+  accountId: string,
+  tinkUserId: string,
+  firebaseUserId: string,
+  pending: boolean,
+  earliestBookedDate: string|undefined
+}) {
   logger.info(`Updating transactions for account ${params.accountId}`);
-  const bulkWriter = firestore.bulkWriter();
-  const transactionsCollection = firestore.collection("bankAccounts").doc(params.accountId).collection("bankAccounts-transactions");
   let totalWrittenTransactions = 0;
-  bulkWriter.onWriteResult(() => totalWrittenTransactions++);
+
+  const accessToken = await getAccessTokenForTinkUserId(params.tinkUserId, ["transactions:read", "accounts:read"]);
+
+  let stableAccountId: string;
+  if (params.anonymous) {
+    const account = await getAccount({accessToken, accountId: params.accountId});
+    stableAccountId = getStableAccountId({account, firebaseUserId: params.firebaseUserId});
+  }
 
   for await (const transaction of getAllTransactions({
-    accessToken: await getAccessTokenForUserId(params.externalUserId, "transactions:read"),
+    accessToken,
     accountIds: [params.accountId],
     earliestBookedDate: params.earliestBookedDate,
     latestBookedDate: undefined,
     pageSize: undefined,
     status: params.pending ? "PENDING" : "BOOKED",
   })) {
-    firestore.bundle();
-    const rawDate = transaction.dates?.value ?? transaction.dates?.booked;
-    const data = {
-      id: transaction.id,
-      categoryId: null,
-      expenseId: null,
-      userId: params.externalUserId,
-      accountId: firestore.collection("bankAccounts").doc(transaction.accountId),
-      pending: params.pending,
-      amount: amountToNumber(transaction.amount),
-      currencyCode: transaction.amount.currencyCode,
-      description: {
-        original: transaction.descriptions?.original ?? null,
-        cleaned: transaction.descriptions?.display ?? null,
-      },
-      date: rawDate ? Timestamp.fromMillis(Date.parse(rawDate)) : Timestamp.now(),
-      type: transaction.types.type,
-    };
-    void bulkWriter.create(transactionsCollection.doc(transaction.id), data).catch(() => {
-      return bulkWriter.set(transactionsCollection.doc(transaction.id), data, {mergeFields: [
-        "id",
-        "userId",
-        "accountId",
-        "pending",
-        "amount",
-        "currencyCode",
-        "description.original",
-        "description.cleaned",
-        "date",
-        "type",
-      ]});
-    });
+    if (params.anonymous) {
+      setStableTransactionId({transaction, firebaseUserId: params.firebaseUserId});
+      transaction.accountId = stableAccountId!;
+    }
+    // Pending transactions are updated many times until it's not pending.
+    // Booked transactions are generally created once.
+    if (params.pending) {
+      await updateTransaction({transaction})
+        .catch(() => createTransaction({firebaseUserId: params.firebaseUserId, transaction}));
+    } else {
+      await createTransaction({firebaseUserId: params.firebaseUserId, transaction})
+        .catch(() => updateTransaction({transaction}));
+    }
+    totalWrittenTransactions++;
   }
-  await bulkWriter.close();
   logger.info(`Written ${totalWrittenTransactions} transactions`);
 }

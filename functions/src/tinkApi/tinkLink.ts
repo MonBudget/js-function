@@ -1,19 +1,21 @@
-import {TINK_CLIENT_ID, getAccessTokenForUserId, getCodeForTinkLink} from "./auth";
-import {getUserProfile} from "./user";
+import {getTinkClientId} from "../vars";
+import {getCodeForTinkLink} from "./auth";
+import {createAnonymousUser} from "./user";
 
 export async function buildTinkLinkForConnectAccounts(params: {
-    redirectUri: string,
-    externalUserId: string,
-    readonly state?: string,
+  redirectUri: string,
+  externalUserId: string,
+  market: string,
+  locale: string,
+  readonly state?: string,
 }): Promise<URL> {
   const authorizationCode = await getCodeForTinkLink(params.externalUserId);
-  const tinkUserProfile = await getUserProfile(await getAccessTokenForUserId(params.externalUserId, "user:read"));
 
   const tinkLink = new URL("https://link.tink.com/1.0/transactions/connect-accounts");
-  tinkLink.searchParams.append("client_id", TINK_CLIENT_ID);
+  tinkLink.searchParams.append("client_id", getTinkClientId());
   tinkLink.searchParams.append("redirect_uri", params.redirectUri);
-  tinkLink.searchParams.append("market", tinkUserProfile.market);
-  tinkLink.searchParams.append("locale", tinkUserProfile.locale);
+  tinkLink.searchParams.append("market", params.market);
+  tinkLink.searchParams.append("locale", params.locale);
   tinkLink.searchParams.append("authorization_code", authorizationCode);
   if (params.state) {
     tinkLink.searchParams.append("state", params.state);
@@ -22,23 +24,47 @@ export async function buildTinkLinkForConnectAccounts(params: {
 }
 
 export async function buildTinkLinkForCredentialsRefresh(params: {
-    redirectUri: string,
-    externalUserId: string,
-    readonly state?: string,
-    credentialsId: string,
+  redirectUri: string,
+  externalUserId: string,
+  market: string,
+  locale: string,
+  readonly state?: string,
+  credentialsId: string,
 }): Promise<URL> {
   const authorizationCode = await getCodeForTinkLink(params.externalUserId);
-  const tinkUserProfile = await getUserProfile(await getAccessTokenForUserId(params.externalUserId, "user:read"));
 
   const tinkLink = new URL("https://link.tink.com/1.0/transactions/update-consent");
-  tinkLink.searchParams.append("client_id", TINK_CLIENT_ID);
+  tinkLink.searchParams.append("client_id", getTinkClientId());
   tinkLink.searchParams.append("redirect_uri", params.redirectUri);
-  tinkLink.searchParams.append("market", tinkUserProfile.market);
-  tinkLink.searchParams.append("locale", tinkUserProfile.locale);
+  tinkLink.searchParams.append("market", params.market);
+  tinkLink.searchParams.append("locale", params.locale);
   tinkLink.searchParams.append("authorization_code", authorizationCode);
   tinkLink.searchParams.append("credentials_id", params.credentialsId);
   if (params.state) {
     tinkLink.searchParams.append("state", params.state);
   }
   return tinkLink;
+}
+
+export async function buildTinkLinkForOneTimeConnectAccounts(params: {
+  redirectUri: string,
+  market: string,
+  locale: string,
+  readonly state?: string,
+}) {
+  const anonymousUser = await createAnonymousUser({market: params.market, locale: params.locale});
+
+  const tinkLink = new URL("https://link.tink.com/1.0/transactions/connect-accounts");
+  tinkLink.searchParams.append("client_id", getTinkClientId());
+  tinkLink.searchParams.append("redirect_uri", params.redirectUri);
+  tinkLink.searchParams.append("market", params.market);
+  tinkLink.searchParams.append("locale", params.locale);
+  tinkLink.searchParams.append("authorization_token", anonymousUser.access_token);
+  if (params.state) {
+    tinkLink.searchParams.append("state", params.state);
+  }
+  return {
+    anonymousUserId: anonymousUser.user.id,
+    tinkLinkUrl: tinkLink,
+  };
 }

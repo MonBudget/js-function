@@ -2,27 +2,14 @@ import {fetcheuh} from "../shared/httpUtils";
 import * as zod from "zod";
 
 
-export async function getProviderConsents(params:{
+export async function getProviderConsent(params:{
     accessToken: string,
-    credentialsId?: string,
+    credentialsId: string,
   }) {
-  const url = new URL("https://api.tink.com/api/v1/provider-consents");
-  if (params.credentialsId) url.searchParams.append("credentialsId", params.credentialsId);
-
-  return await fetcheuh("GET", url, params.accessToken, undefined, GetProviderConsentsResponseSchema);
+  return (await fetcheuh("GET", "https://api.tink.com/api/v1/provider-consents", params.accessToken, undefined, GetProviderConsentsResponseSchema)).providerConsents.at(0);
 }
 
-export async function getProviders(params:{
-    accessToken: string,
-    includeTestProviders: boolean,
-  }) {
-  const url = new URL("https://api.tink.com/api/v1/providers");
-  url.searchParams.append("includeTestProviders", params.includeTestProviders.toString());
-
-  return await fetcheuh("GET", url, params.accessToken, undefined, GetProvidersResponseSchema);
-}
-
-export async function getProvider(params:{
+export async function getProviderByName(params:{
     accessToken: string,
     name: string,
     includeTestProviders: boolean,
@@ -80,12 +67,18 @@ const GetProviderConsentsResponseSchema = zod.object({
   })),
 });
 
+
+const ProviderSchema = zod.object({
+  financialInstitutionId: zod.string(),
+  financialInstitutionName: zod.string(),
+  images: zod.object({
+    icon: zod.string(),
+  }),
+});
+
+
+export type Provider = zod.infer<typeof ProviderSchema>
+
 const GetProvidersResponseSchema = zod.object({
-  providers: zod.array(zod.object({
-    financialInstitutionId: zod.string(),
-    financialInstitutionName: zod.string(),
-    images: zod.object({
-      icon: zod.string(),
-    }),
-  })),
+  providers: zod.array(ProviderSchema),
 });

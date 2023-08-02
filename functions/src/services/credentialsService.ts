@@ -1,23 +1,38 @@
 import * as logger from "firebase-functions/logger";
-import {getAccessTokenForUserId} from "../tinkApi/auth";
-import {getProvider, getProviderConsents} from "../tinkApi/credentials";
+import {getAccessTokenForTinkUserId} from "../tinkApi/auth";
+import {getProviderByName, getProviderConsent} from "../tinkApi/credentials";
 import {updateBankCredentials} from "../repository/bankCredentials";
+import {getAllAccounts} from "../tinkApi/account";
+import {getStableAccountId} from "./anonymousStuff";
 
 
-export async function saveCredentials(params: {userId: string, credentialsId: string}) {
+export async function saveCredentials(params: {anonymous: boolean, tinkUserId: string, firebaseUserId: string, credentialsId: string}) {
   logger.info(`Saving credentials ${params.credentialsId}...`);
-  const accessToken = await getAccessTokenForUserId(params.userId, ["provider-consents:read", "credentials:read"]);
-  const providerConsent = (await getProviderConsents({
+  const accessToken = await getAccessTokenForTinkUserId(params.tinkUserId, ["provider-consents:read", "credentials:read", "accounts:read"]);
+  const providerConsent = await getProviderConsent({
     accessToken: accessToken,
     credentialsId: params.credentialsId,
-  })).providerConsents.at(0);
+  });
   if (providerConsent) {
-    const provider = await getProvider({accessToken, includeTestProviders: true, name: providerConsent.providerName});
+    const provider = await getProviderByName({accessToken, includeTestProviders: true, name: providerConsent.providerName});
     if (provider) {
+      let accountIds: string[];
+      let originalAccountIds: string[]|undefined;
+      if (params.anonymous) {
+        accountIds = [];
+        originalAccountIds = providerConsent.accountIds;
+        for await (const account of await getAllAccounts({accessToken, accountIds: providerConsent.accountIds})) {
+          accountIds.push(getStableAccountId({firebaseUserId: params.firebaseUserId, account}));
+        }
+      } else {
+        accountIds = providerConsent.accountIds;
+      }
+
       await updateBankCredentials({
         credentialsId: params.credentialsId,
-        userId: params.userId,
-        accountIds: providerConsent.accountIds,
+        userId: params.firebaseUserId,
+        originalAccountIds,
+        accountIds,
         status: providerConsent.status,
         error: providerConsent.detailedError ?? null,
         lastRefresh: providerConsent.statusUpdated,

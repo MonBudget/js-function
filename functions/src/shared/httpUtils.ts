@@ -1,6 +1,6 @@
 import {Request as FunctionHttpRequest} from "firebase-functions/v2/https";
 import {ZodType, ZodError, ZodTypeDef, any as zodAny} from "zod";
-import {ResponseError} from "./ResponseError";
+import {ClientResponseError, ResponseError} from "./ResponseError";
 import * as logger from "firebase-functions/logger";
 import {Response as FunctionHttpResponse} from "express-serve-static-core";
 
@@ -21,6 +21,7 @@ export async function fetcheuh<TIn, TOut, B>(
   bearerToken: string | undefined = undefined,
   body: URLSearchParams | B | undefined = undefined,
   responseSchema: ZodType<TOut, ZodTypeDef, TIn> | undefined = undefined,
+  otherParams?: {headers: {[key: string]: string}}
 ): Promise<TOut> {
   let contentType: string;
   let content: string | URLSearchParams;
@@ -34,6 +35,7 @@ export async function fetcheuh<TIn, TOut, B>(
 
   const headers: HeadersInit = {
     "Content-Type": `${contentType};charset=UTF-8`,
+    ...otherParams?.headers,
   };
   if (bearerToken) {
     headers["Authorization"] = `Bearer ${bearerToken}`;
@@ -58,7 +60,7 @@ async function handleJsonResponse<TOut, TIn>(
     jsonPayload = undefined;
   }
   if (!response.ok) {
-    throw new ResponseError(500, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, jsonPayload);
+    throw new ClientResponseError(response.status, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, jsonPayload);
   }
   try {
     return responseSchema.parse(jsonPayload);

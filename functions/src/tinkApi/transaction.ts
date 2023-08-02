@@ -4,12 +4,12 @@ import {MonetaryAmountSchema, nextPageTokenTransformer} from "./shared";
 
 export async function getTransactionsPage(params: {
   accessToken: string,
-  pageSize: number | undefined,
-  earliestBookedDate: string | undefined,
-  latestBookedDate: string | undefined,
-  pageToken: string | undefined,
-  accountIds: string[] | undefined,
-  status: TransactionStatus | TransactionStatus[] | undefined,
+  pageSize?: number,
+  earliestBookedDate?: string,
+  latestBookedDate?: string,
+  pageToken?: string,
+  accountIds?: string[],
+  status?: TransactionStatus | TransactionStatus[],
 }) {
   const url = new URL("https://api.tink.com/data/v2/transactions");
   if (params.pageSize) url.searchParams.append("pageSize", params.pageSize.toString());
@@ -30,11 +30,11 @@ export async function getTransactionsPage(params: {
 
 export async function* getAllTransactions(params: {
   accessToken: string,
-  pageSize: number | undefined,
-  earliestBookedDate: string | undefined,
-  latestBookedDate: string | undefined,
-  accountIds: string[] | undefined,
-  status: TransactionStatus | TransactionStatus[] | undefined,
+  pageSize?: number,
+  earliestBookedDate?: string,
+  latestBookedDate?: string,
+  accountIds?: string[],
+  status?: TransactionStatus | TransactionStatus[],
 }) {
   let nextPageToken: string | undefined = undefined;
   while (true) {

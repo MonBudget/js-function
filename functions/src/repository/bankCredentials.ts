@@ -9,6 +9,7 @@ const BankCredentialsSchema = zod.object({
   userId: zod.string(),
   status: zod.string(),
   accountIds: zod.array(zod.string()),
+  originalAccountIds: zod.array(zod.string()).optional(),
   error: zod.object({
     type: zod.enum([
       "UNKNOWN_ERROR",
@@ -36,10 +37,11 @@ export type BankCredentials = zod.infer<typeof BankCredentialsSchema>
 
 export async function updateBankCredentials(credentials: BankCredentials) {
   const validatedCredentials = BankCredentialsSchema.parse(credentials);
-  await firestore.collection("bankCredentials").doc(validatedCredentials.credentialsId).set({
+  const data = {
     credentialsId: validatedCredentials.credentialsId,
     userId: validatedCredentials.userId,
-    accountIds: validatedCredentials.accountIds.map((accountId) => firestore.collection("bankAccounts").doc(accountId)),
+    accountIds: validatedCredentials.accountIds,
+    originalAccountIds: validatedCredentials.originalAccountIds,
     status: validatedCredentials.status,
     error: validatedCredentials.error,
     lastRefresh: Timestamp.fromDate(validatedCredentials.lastRefresh),
@@ -49,5 +51,9 @@ export async function updateBankCredentials(credentials: BankCredentials) {
       name: validatedCredentials.financialInstitution.name,
       logo: validatedCredentials.financialInstitution.logo,
     },
-  });
+  };
+  if (!data.originalAccountIds) {
+    delete data.originalAccountIds;
+  }
+  await firestore.collection("bankCredentials").doc(validatedCredentials.credentialsId).set(data);
 }

@@ -27,7 +27,7 @@ export async function handleWebhookRegisterRequest(req: Request) {
       "account-booked-transactions:modified",
       "refresh:finished",
       "account:updated",
-      "account:created",
+      // "account:created", already receiving account:updated
     ]
   );
   await firestore.collection("tink-webhooks").doc(webhook.id).set(webhook);
