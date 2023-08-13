@@ -4,9 +4,10 @@ import {getProviderByName, getProviderConsent} from "../tinkApi/credentials";
 import {updateBankCredentials} from "../repository/bankCredentials";
 import {getAllAccounts} from "../tinkApi/account";
 import {getStableAccountId} from "./anonymousStuff";
+import {tryGetRawPayload} from "../shared/httpUtils";
 
 
-export async function saveCredentials(params: {anonymous: boolean, tinkUserId: string, firebaseUserId: string, credentialsId: string}) {
+export async function saveCredentials(params: {tinkUserId: string, firebaseUserId: string, credentialsId: string}) {
   logger.info(`Saving credentials ${params.credentialsId}...`);
   const accessToken = await getAccessTokenForTinkUserId(params.tinkUserId, ["provider-consents:read", "credentials:read", "accounts:read"]);
   const providerConsent = await getProviderConsent({
@@ -16,16 +17,10 @@ export async function saveCredentials(params: {anonymous: boolean, tinkUserId: s
   if (providerConsent) {
     const provider = await getProviderByName({accessToken, includeTestProviders: true, name: providerConsent.providerName});
     if (provider) {
-      let accountIds: string[];
-      let originalAccountIds: string[]|undefined;
-      if (params.anonymous) {
-        accountIds = [];
-        originalAccountIds = providerConsent.accountIds;
-        for await (const account of await getAllAccounts({accessToken, accountIds: providerConsent.accountIds})) {
-          accountIds.push(getStableAccountId({firebaseUserId: params.firebaseUserId, account}));
-        }
-      } else {
-        accountIds = providerConsent.accountIds;
+      const accountIds = [];
+      const originalAccountIds = providerConsent.accountIds;
+      for await (const account of await getAllAccounts({accessToken, accountIds: providerConsent.accountIds})) {
+        accountIds.push(getStableAccountId({firebaseUserId: params.firebaseUserId, account}));
       }
 
       await updateBankCredentials({
@@ -33,6 +28,7 @@ export async function saveCredentials(params: {anonymous: boolean, tinkUserId: s
         userId: params.firebaseUserId,
         originalAccountIds,
         accountIds,
+        providerName: providerConsent.providerName,
         status: providerConsent.status,
         error: providerConsent.detailedError ?? null,
         lastRefresh: providerConsent.statusUpdated,
@@ -42,6 +38,8 @@ export async function saveCredentials(params: {anonymous: boolean, tinkUserId: s
           name: provider.financialInstitutionName,
           logo: provider.images.icon,
         },
+        rawProviderConsent: tryGetRawPayload(providerConsent),
+        rawProvider: tryGetRawPayload(provider),
       });
       logger.info(`Refreshed credentials ${params.credentialsId}`);
     } else {

@@ -6,7 +6,12 @@ export async function getProviderConsent(params:{
     accessToken: string,
     credentialsId: string,
   }) {
-  return (await fetcheuh("GET", "https://api.tink.com/api/v1/provider-consents", params.accessToken, undefined, GetProviderConsentsResponseSchema)).providerConsents.at(0);
+  const response = await fetcheuh("GET", "https://api.tink.com/api/v1/provider-consents", params.accessToken, undefined, GetProviderConsentsResponseSchema);
+  const providerConsent = response.providerConsents.at(0);
+  if (!providerConsent) {
+    return undefined;
+  }
+  return {...providerConsent, __originalPayload__: response.__originalPayload__.providerConsents?.at(0)};
 }
 
 export async function getProviderByName(params:{
@@ -18,7 +23,12 @@ export async function getProviderByName(params:{
   url.searchParams.append("name", params.name);
   url.searchParams.append("includeTestProviders", params.includeTestProviders.toString());
 
-  return (await fetcheuh("GET", url, params.accessToken, undefined, GetProvidersResponseSchema)).providers.at(0);
+  const response = await fetcheuh("GET", url, params.accessToken, undefined, GetProvidersResponseSchema);
+  const provider = response.providers.at(0);
+  if (!provider) {
+    return undefined;
+  }
+  return {...provider, __originalPayload__: response.__originalPayload__.providers?.at(0)};
 }
 
 export async function removeCredentials(params:{

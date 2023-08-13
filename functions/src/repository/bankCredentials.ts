@@ -25,6 +25,7 @@ const BankCredentialsSchema = zod.object({
       retryable: zod.boolean(),
     }),
   }).nullable(),
+  providerName: zod.string(),
   lastRefresh: zod.date(),
   sessionExpiration: zod.date().nullable(),
   financialInstitution: zod.object({
@@ -32,6 +33,8 @@ const BankCredentialsSchema = zod.object({
     name: zod.string(),
     logo: zod.string(),
   }),
+  rawProviderConsent: zod.unknown(),
+  rawProvider: zod.unknown(),
 });
 export type BankCredentials = zod.infer<typeof BankCredentialsSchema>
 
@@ -45,12 +48,15 @@ export async function updateBankCredentials(credentials: BankCredentials) {
     status: validatedCredentials.status,
     error: validatedCredentials.error,
     lastRefresh: Timestamp.fromDate(validatedCredentials.lastRefresh),
+    providerName: validatedCredentials.providerName,
     sessionExpiration: validatedCredentials.sessionExpiration ? Timestamp.fromDate(validatedCredentials.sessionExpiration) : null,
     financialInstitution: {
       id: validatedCredentials.financialInstitution.id,
       name: validatedCredentials.financialInstitution.name,
       logo: validatedCredentials.financialInstitution.logo,
     },
+    rawProviderConsent: validatedCredentials.rawProviderConsent ? validatedCredentials.rawProviderConsent : null,
+    rawProvider: validatedCredentials.rawProvider ? validatedCredentials.rawProvider : null,
   };
   if (!data.originalAccountIds) {
     delete data.originalAccountIds;

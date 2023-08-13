@@ -69,7 +69,6 @@ export async function handleTinkEvent(req: Request) {
         throw new ResponseError(400, "Received event for anonymous user, but unable to resolve real firebase userId");
       }
       event.context.externalUserId = firebaseUserIdDoc.firebaseUserId;
-      event.context.anonymous = true;
     }
 
     await processEvent(event);
@@ -107,7 +106,6 @@ async function handleRefreshFinishedEvent(event: RefreshFinishedEvent) {
     tinkUserId: event.context.userId,
     firebaseUserId: event.context.externalUserId,
     credentialsId: event.content.credentialsId,
-    anonymous: event.context.anonymous,
   });
 }
 
@@ -115,11 +113,8 @@ async function handleAccountUpdatedEvent(event: AccountUpdatedEvent) {
   logger.info(`Updating account ${event.content.id}...`);
   const accessToken = await getAccessTokenForTinkUserId(event.context.userId, ["accounts:read"]);
   const account = await getAccount({accountId: event.content.id, accessToken});
-  let originalAccountId: string|undefined;
-  if (event.context.anonymous) {
-    account.id = getStableAccountId({account, firebaseUserId: event.context.externalUserId});
-    originalAccountId = event.content.id;
-  }
+  account.id = getStableAccountId({account, firebaseUserId: event.context.externalUserId});
+  const originalAccountId = event.content.id;
   await saveAccount({account, firebaseUserId: event.context.externalUserId, originalAccountId});
   logger.info(`Updated account ${event.content.id}`);
 }
@@ -130,7 +125,6 @@ async function handleAccountTransactionsModifiedEvent(event: AccountTransactions
     firebaseUserId: event.context.externalUserId,
     tinkUserId: event.context.userId,
     pending: true,
-    anonymous: event.context.anonymous,
     earliestBookedDate: undefined,
   });
 }
@@ -144,13 +138,11 @@ async function handleAccountBookedTransactionsModifiedEvent(event: AccountBooked
     firebaseUserId: event.context.externalUserId,
     tinkUserId: event.context.userId,
     pending: false,
-    anonymous: event.context.anonymous,
     earliestBookedDate: max(event.content.account.transactionsModifiedEarliestBookedDate, getPastDate(MAX_PAST_DAYS_TO_FETCH.value())),
   });
 }
 
 async function updateTransactions(params: {
-  anonymous: boolean,
   accountId: string,
   tinkUserId: string,
   firebaseUserId: string,
@@ -162,11 +154,8 @@ async function updateTransactions(params: {
 
   const accessToken = await getAccessTokenForTinkUserId(params.tinkUserId, ["transactions:read", "accounts:read"]);
 
-  let stableAccountId: string;
-  if (params.anonymous) {
-    const account = await getAccount({accessToken, accountId: params.accountId});
-    stableAccountId = getStableAccountId({account, firebaseUserId: params.firebaseUserId});
-  }
+  const account = await getAccount({accessToken, accountId: params.accountId});
+  const stableAccountId = getStableAccountId({account, firebaseUserId: params.firebaseUserId});
 
   for await (const transaction of getAllTransactions({
     accessToken,
@@ -176,10 +165,9 @@ async function updateTransactions(params: {
     pageSize: undefined,
     status: params.pending ? "PENDING" : "BOOKED",
   })) {
-    if (params.anonymous) {
-      setStableTransactionId({transaction, firebaseUserId: params.firebaseUserId});
-      transaction.accountId = stableAccountId!;
-    }
+    await setStableTransactionId({transaction, firebaseUserId: params.firebaseUserId});
+    transaction.accountId = stableAccountId;
+
     // Pending transactions are updated many times until it's not pending.
     // Booked transactions are generally created once.
     if (params.pending) {

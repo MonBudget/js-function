@@ -2,6 +2,7 @@ import {BulkWriter, FieldValue, Timestamp} from "firebase-admin/firestore";
 import {firestore} from "../firebase/firestore";
 import {Transaction} from "../tinkApi/transaction";
 import {amountToNumber} from "../tinkApi/shared";
+import {tryGetRawPayload} from "../shared/httpUtils";
 
 export function createTransaction(params: {firebaseUserId: string, transaction: Transaction, bulkWriter?: BulkWriter}) {
   const {firebaseUserId, transaction, bulkWriter} = params;
@@ -36,6 +37,7 @@ function getDocumentFieldsToUpdate(transaction: Transaction) {
     pending: transaction.status === "PENDING",
     descriptionOriginal: transaction.descriptions?.original ?? null,
     descriptionCleaned: transaction.descriptions?.display ?? null,
+    rawTransaction: tryGetRawPayload(transaction),
   };
 }
 

@@ -39,8 +39,8 @@ export async function* getAllTransactions(params: {
   let nextPageToken: string | undefined = undefined;
   while (true) {
     const page = await getTransactionsPage({...params, pageToken: nextPageToken});
-    for (const transaction of page.transactions) {
-      yield transaction;
+    for (const {value: transaction, index} of page.transactions.map((value, index) => ({index, value}))) {
+      yield {...transaction, __originalPayload__: page.__originalPayload__.transactions[index]};
     }
     if (!page.nextPageToken || page.nextPageToken.length == 0) {
       return;

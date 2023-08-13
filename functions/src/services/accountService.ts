@@ -2,8 +2,9 @@ import {Timestamp} from "firebase-admin/firestore";
 import {firestore} from "../firebase/firestore";
 import {Account} from "../tinkApi/account";
 import {amountToNumber} from "../tinkApi/shared";
+import {tryGetRawPayload} from "../shared/httpUtils";
 
-export async function saveAccount(params: {account: Account, firebaseUserId: string, originalAccountId: string|undefined}) {
+export async function saveAccount(params: {account: Account, firebaseUserId: string, originalAccountId: string}) {
   const account = params.account;
   const accountDocument = firestore.collection("bankAccounts").doc(account.id);
   const data = {
@@ -18,9 +19,7 @@ export async function saveAccount(params: {account: Account, firebaseUserId: str
     lastRefresh: Timestamp.fromDate(account.dates.lastRefreshed),
     financialInstitutionId: account.financialInstitutionId,
     financialAccountNumber: account.identifiers?.financialInstitution?.accountNumber,
+    rawAccount: tryGetRawPayload(account),
   };
-  if (!data.originalAccountId) {
-    delete data.originalAccountId;
-  }
   await accountDocument.set(data, {merge: true});
 }

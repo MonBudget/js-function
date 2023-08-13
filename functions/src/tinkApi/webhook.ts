@@ -86,7 +86,6 @@ const BaseTinkEventSchema = zod.object({
   context: zod.object({
     userId: zod.string(),
     externalUserId: zod.string(), // Normally optional, but we are always givin the firebase uid as the externalUserId
-    anonymous: zod.boolean().default(false), // synthetic field set by us
   }),
 });
 

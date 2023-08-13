@@ -22,7 +22,7 @@ export async function fetcheuh<TIn, TOut, B>(
   body: URLSearchParams | B | undefined = undefined,
   responseSchema: ZodType<TOut, ZodTypeDef, TIn> | undefined = undefined,
   otherParams?: {headers: {[key: string]: string}}
-): Promise<TOut> {
+): Promise<TOut & WithJsonPayload> {
   let contentType: string;
   let content: string | URLSearchParams;
   if (body instanceof URLSearchParams) {
@@ -49,10 +49,17 @@ export async function fetcheuh<TIn, TOut, B>(
   return handleJsonResponse(response, responseSchema ?? zodAny());
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithJsonPayload = {__originalPayload__: any}
+
+export function tryGetRawPayload(object: unknown) {
+  return Object.prototype.hasOwnProperty.call(object, "__originalPayload__") ? (object as unknown as WithJsonPayload).__originalPayload__ : null;
+}
+
 async function handleJsonResponse<TOut, TIn>(
   response: Response,
   responseSchema: ZodType<TOut, ZodTypeDef, TIn>,
-): Promise<TOut> {
+): Promise<TOut & WithJsonPayload> {
   let jsonPayload: unknown;
   try {
     jsonPayload = await response.json();
@@ -63,7 +70,7 @@ async function handleJsonResponse<TOut, TIn>(
     throw new ClientResponseError(response.status, `Http request error ${response.status}(${response.statusText}) for ${response.url}`, jsonPayload);
   }
   try {
-    return responseSchema.parse(jsonPayload);
+    return {...responseSchema.parse(jsonPayload), __originalPayload__: jsonPayload};
   } catch (error) {
     if (error instanceof ZodError) {
       throw new ResponseError(500, `Error during http response parsing for ${response.url}`, {json: jsonPayload, errors: error.errors});
