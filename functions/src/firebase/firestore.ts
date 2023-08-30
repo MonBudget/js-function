@@ -1,4 +1,12 @@
-import {Filter, initializeFirestore, FieldPath, Query, QueryDocumentSnapshot, BulkWriter} from "firebase-admin/firestore";
+import {
+  Filter,
+  initializeFirestore,
+  FieldPath,
+  Query,
+  QueryDocumentSnapshot,
+  BulkWriter,
+  DocumentReference,
+} from "firebase-admin/firestore";
 import {app} from "./app";
 import {fromEvent, lastValueFrom} from "rxjs";
 import {takeUntil, concatMap} from "rxjs/operators";
@@ -7,8 +15,8 @@ export const firestore = initializeFirestore(app);
 
 export function startsWith(fieldPath: string | FieldPath, value: string) {
   const strlength = value.length;
-  const strFrontCode = value.slice(0, strlength-1);
-  const strEndCode = value.slice(strlength-1, value.length);
+  const strFrontCode = value.slice(0, strlength - 1);
+  const strEndCode = value.slice(strlength - 1, value.length);
 
   const startcode = value;
   const endcode = strFrontCode + String.fromCharCode(strEndCode.charCodeAt(0) + 1);
@@ -22,7 +30,7 @@ export function startsWith(fieldPath: string | FieldPath, value: string) {
 export async function removeDocumentsRecursively(query: Query, bulkWriter: BulkWriter) {
   await forEachSnapshotAsync(
     query,
-    (data) => recursiveDelete(data, bulkWriter)
+    (data) => recursiveDelete(data.ref, bulkWriter)
   );
 }
 
@@ -34,14 +42,14 @@ export async function forEachSnapshotAsync(query: Query, onEach: (doc: QueryDocu
   );
 }
 
-async function recursiveDelete(snapshot: QueryDocumentSnapshot, bulkWriter: BulkWriter) {
-  for (const collectionToRemove of (await snapshot.ref.listCollections())) {
+export async function recursiveDelete(ref: DocumentReference, bulkWriter: BulkWriter) {
+  for (const collectionToRemove of (await ref.listCollections())) {
     await forEachSnapshotAsync(
       collectionToRemove,
-      (data) => recursiveDelete(data, bulkWriter)
+      (data) => recursiveDelete(data.ref, bulkWriter)
     );
   }
-  void bulkWriter.delete(snapshot.ref);
+  void bulkWriter.delete(ref);
 }
 
 function streamData(query: Query) {

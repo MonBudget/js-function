@@ -6,6 +6,10 @@ created from:
 - firebase init firestore
 - firebase init functions
 
+when fetched
+- cd functions
+- yarn
+
 dev mode, run in separated consoles:
 - yarn run build:watch
 - firebase emulators:start

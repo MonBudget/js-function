@@ -71,6 +71,9 @@ export const onAppHttpCall = onRequest({
   } else if (isRequest(req, "GET", "/bank-account/refresh-link")) {
     const {handleBankConnectionRefreshRequest} = await import("./functions/handleBankConnectionRefreshRequest");
     return handleBankConnectionRefreshRequest(req);
+  } else if (isRequest(req, "DELETE", "/bank-account")) {
+    const {handleBankCredentialsDelete} = await import("./functions/handleBankCredentialsDelete");
+    return handleBankCredentialsDelete(req);
   } else {
     return noRouteFound();
   }
@@ -82,7 +85,12 @@ export const onTransactionUpdated = onDocumentUpdated("/bankAccounts/{accountId}
     return;
   }
   const {onTransactionUpdated} = await import("./functions/onTransactionUpdated");
-  return onTransactionUpdated({accountId: event.params.accountId, transactionId: event.params.transactionId, before: event.data.before, after: event.data.after});
+  return onTransactionUpdated({
+    accountId: event.params.accountId,
+    transactionId: event.params.transactionId,
+    before: event.data.before,
+    after: event.data.after,
+  });
 });
 
 export const onExpenseRemoved = onDocumentDeleted("/expenses/{expenseId}", async (event) => {
