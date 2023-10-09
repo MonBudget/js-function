@@ -87,14 +87,15 @@ export function handleHttpRequest(router: (req: FunctionHttpRequest, res: Functi
   (request: FunctionHttpRequest, response: FunctionHttpResponse) => void | Promise<void> {
   return async (req, res) => {
     try {
+      logger.debug("Incoming request", req);
       const body = await router(req, res, () => {
         logger.info("Request body", req.body);
         throw new ResponseError(404, "No matching handler for your request");
       });
-      res.status(200).send(body);
+      res.status(200).send({status: "200", data: body ?? {}});
     } catch (error) {
       if (error instanceof ResponseError) {
-        res.status(error.responseCode).send({message: error.message, details: error.details});
+        res.status(error.responseCode).send({status: error.message, data: error.details});
       } else {
         logger.error("Internal error", error);
         let reason: string | undefined;
@@ -103,7 +104,7 @@ export function handleHttpRequest(router: (req: FunctionHttpRequest, res: Functi
         } else {
           reason = error?.toString();
         }
-        res.status(500).send({message: "Internal server error", reason});
+        res.status(500).send({status: "Internal server error", data: reason});
       }
     }
   };

@@ -7,23 +7,16 @@ import {Timestamp} from "firebase-admin/firestore";
 const BankCredentialsSchema = zod.object({
   credentialsId: zod.string(),
   userId: zod.string(),
-  status: zod.string(),
+  status: zod.string().nullable(),
   accountIds: zod.array(zod.string()),
   originalAccountIds: zod.array(zod.string()).optional(),
   error: zod.object({
-    type: zod.enum([
-      "UNKNOWN_ERROR",
-      "TINK_SIDE_ERROR",
-      "PROVIDER_ERROR",
-      "USER_LOGIN_ERROR",
-      "AUTHORIZATION_ERROR",
-      "ACCOUNT_INFORMATION_ERROR",
-    ]),
+    type: zod.string(),
     displayMessage: zod.string(),
     details: zod.object({
-      reason: zod.string(),
-      retryable: zod.boolean(),
-    }),
+      reason: zod.string().nullable(),
+      retryable: zod.boolean().nullable(),
+    }).nullable(),
   }).nullable(),
   providerName: zod.string(),
   lastRefresh: zod.date(),

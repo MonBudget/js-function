@@ -7,6 +7,7 @@ import {checkIdToken} from "../firebase/auth";
 import {getQueryParam} from "../shared/httpUtils";
 import {removeCredentials} from "../tinkApi/credentials";
 import {ClientResponseError, ResponseError} from "../shared/ResponseError";
+import {plaidClient} from "../plaidApi/plaidService";
 
 export async function handleBankCredentialsDelete(req: Request) {
   const decodedIdToken = await checkIdToken(req);
@@ -28,6 +29,20 @@ export async function handleBankCredentialsDelete(req: Request) {
     } else throw error;
   }
 
+  try {
+    const accessTokenDoc = await firestore.collection("plaid-access-tokens").doc(credentialsId).get();
+    const accessToken = accessTokenDoc.get("accessToken");
+    logger.info(`Removing plaid item ${credentialsId} with accesToken ${accessToken}`);
+    const result = await plaidClient.itemRemove({
+      access_token: accessToken,
+    });
+    await firestore.collection("plaid-access-tokens").doc(credentialsId).delete();
+
+    logger.info(`Removed plaid item ${credentialsId} success`, result.data);
+  } catch (error) {
+    logger.warn(`Plaid item ${credentialsId} not removed`, error);
+  }
+
   const document = (await firestore.collection("bankCredentials")
     .where(FieldPath.documentId(), "==", credentialsId)
     .where("userId", "==", userId)
@@ -42,6 +57,8 @@ export async function handleBankCredentialsDelete(req: Request) {
 
   const accountIds: string[] = document.data().accountIds;
 
+  logger.info(`Account ids to delete for bank credentials ${credentialsId} for userId ${userId}: ${accountIds}`);
+
   for (const accountId of accountIds) {
     const number = await firestore.collection("bankCredentials")
       .where("accountIds", "array-contains", accountId)
@@ -55,4 +72,6 @@ export async function handleBankCredentialsDelete(req: Request) {
   }
 
   await bulkWriter.close();
+
+  logger.info(`Account ids to delete for bank credentials ${credentialsId} for userId ${userId} finished`);
 }

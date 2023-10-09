@@ -39,7 +39,7 @@ export const onUserDelete = functionsV1.region(REGION)
     timeoutSeconds: 240, // long timeout for handling the huge amount of documents to delete
     memory: "128MB",
     failurePolicy: true,
-    secrets: [_allVars.TINK_KEYS],
+    secrets: [_allVars.TINK_KEYS, _allVars.PLAID_KEYS],
   }).auth.user().onDelete(async (user) => {
     const {handleUserDelete} = await import("./functions/handleUserDelete");
     await handleUserDelete(user);
@@ -61,9 +61,48 @@ export const onTinkEvent = onRequest({
   }
 }));
 
+export const onPlaidWebhook = onRequest({
+  cors: true /* todo: mettre nom de domaine plaid*/,
+  secrets: [_allVars.PLAID_KEYS],
+  timeoutSeconds: 120,
+  memory: "256MiB",
+}, handleHttpRequest(async (req) => {
+  const {handlePlaidWebhook} = await import("./functions/handlePlaidWebhook");
+  return handlePlaidWebhook(req);
+}));
+
+export const onHttpCallPlaidLinkTokenGet = onRequest({
+  cors: true,
+  secrets: [_allVars.PLAID_KEYS],
+}, handleHttpRequest(async (req) => {
+  const {handlePlaidConnectLinkTokenRequest} = await import("./functions/handlePlaidConnectLinkTokenRequest");
+  return handlePlaidConnectLinkTokenRequest(req);
+}));
+
+export const registerPlaidLinkPublicToken = onRequest({
+  cors: true,
+  secrets: [_allVars.PLAID_KEYS],
+  timeoutSeconds: 60,
+  memory: "256MiB",
+}, handleHttpRequest(async (req) => {
+  const {registerPlaidLinkPublicToken} = await import("./functions/registerPlaidLinkPublicToken");
+  return registerPlaidLinkPublicToken(req);
+}));
+
+export const refreshPlaidItems = onRequest({
+  cors: true,
+  secrets: [_allVars.PLAID_KEYS],
+  timeoutSeconds: 60,
+}, handleHttpRequest(async (req) => {
+  const {refreshPlaidItems} = await import("./functions/refreshPlaidItems");
+  return refreshPlaidItems(req);
+}));
+
+
 export const onAppHttpCall = onRequest({
   cors: true,
-  secrets: [_allVars.TINK_KEYS],
+  secrets: [_allVars.TINK_KEYS, _allVars.PLAID_KEYS],
+  memory: "256MiB",
 }, handleHttpRequest(async (req, res, noRouteFound) => {
   if (isRequest(req, "GET", "/bank-account/connect-link")) {
     const {handleBankConnectionLinkRequest} = await import("./functions/handleBankConnectionLinkRequest");

@@ -12,14 +12,14 @@ import {
   checkTinkEventSignature} from "../tinkApi/webhook";
 import {getAccessTokenForTinkUserId} from "../tinkApi/auth";
 import {getAccount} from "../tinkApi/account";
-import {getAllTransactions} from "../tinkApi/transaction";
+import {Transaction, getAllTransactions} from "../tinkApi/transaction";
 import {ResponseError} from "../shared/ResponseError";
 import {saveCredentials} from "../services/credentialsService";
 import {saveAccount} from "../services/accountService";
-import {createTransaction, updateTransaction} from "../services/transactionService";
+import {TransactionEntity, createTransaction, updateTransaction} from "../repository/transactionRepository";
 import {getPastDate, max} from "../shared/utils";
 import {BYPASS_TINK_EVENT_SIGNATURE, BYPASS_TINK_EVENT_SIGNATURE_LOCAL_ONLY, MAX_PAST_DAYS_TO_FETCH} from "../vars";
-import {isAnonymousExternalUserId} from "../tinkApi/shared";
+import {amountToNumber, isAnonymousExternalUserId} from "../tinkApi/shared";
 import {getStableAccountId, setStableTransactionId} from "../services/anonymousStuff";
 
 
@@ -171,13 +171,38 @@ async function updateTransactions(params: {
     // Pending transactions are updated many times until it's not pending.
     // Booked transactions are generally created once.
     if (params.pending) {
-      await updateTransaction({transaction})
-        .catch(() => createTransaction({firebaseUserId: params.firebaseUserId, transaction}));
+      await updateTransaction({transaction: tinkTransactionToDb(transaction, params.firebaseUserId)})
+        .catch(() => createTransaction({transaction: tinkTransactionToDb(transaction, params.firebaseUserId)}));
     } else {
-      await createTransaction({firebaseUserId: params.firebaseUserId, transaction})
-        .catch(() => updateTransaction({transaction}));
+      await createTransaction({transaction: tinkTransactionToDb(transaction, params.firebaseUserId)})
+        .catch(() => updateTransaction({transaction: tinkTransactionToDb(transaction, params.firebaseUserId)}));
     }
     totalWrittenTransactions++;
   }
   logger.info(`Written ${totalWrittenTransactions} transactions`);
+}
+
+function tinkTransactionToDb(transaction: Transaction, firebaseUserId: string): TransactionEntity {
+  const dates = selectTransactionDates({valueDate: transaction.dates?.value, bookingDate: transaction.dates?.booked});
+  return {
+    id: transaction.id,
+    accountId: transaction.accountId,
+    amount: amountToNumber(transaction.amount)!,
+    creationDate: dates.creationDate,
+    paymentDate: dates.paymentDate,
+    currencyCode: transaction.amount.currencyCode,
+    descriptionCleaned: transaction.descriptions?.display ?? transaction.descriptions?.original ?? "",
+    descriptionOriginal: transaction.descriptions?.original ?? "",
+    pending: transaction.status == "PENDING",
+    userId: firebaseUserId,
+  };
+}
+
+function selectTransactionDates(params: {valueDate: string|undefined, bookingDate: string|undefined}) {
+  const [creationDateRaw, paymentDateRaw] = [params.valueDate, params.bookingDate].sort();
+  const creationDate = new Date(creationDateRaw ? Date.parse(creationDateRaw) : Date.now());
+  return {
+    creationDate: creationDate,
+    paymentDate: paymentDateRaw ? new Date(Date.parse(paymentDateRaw)) : creationDate,
+  };
 }

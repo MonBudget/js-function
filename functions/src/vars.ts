@@ -25,6 +25,20 @@ export function getTinkClientSecret() {
   return TINK_KEYS.value().split(":")[1];
 }
 
+// must be in form of tink_id:tink_secret
+export const PLAID_KEYS = defineSecret("PLAID_KEYS");
+// dev budgit "development:6511a3640d705f001be7b6cf:770ef167beedc71363fd946ba6d85f";
+// dev personal use "dev:6383630bd3d18400133510e1:743440b9b50a26b47b400bf170978e";
+export function getPlaidEnv() {
+  return PLAID_KEYS.value().split(":")[0];
+}
+export function getPlaidClientId() {
+  return PLAID_KEYS.value().split(":")[1];
+}
+export function getPlaidClientSecret() {
+  return PLAID_KEYS.value().split(":")[2];
+}
+
 export const DEFAULT_MARKET = defineString("DEFAULT_MARKET", {
   default: "FR",
   input: {
